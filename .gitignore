@@ -1,0 +1,23 @@
+# Never commit credentials
+.env
+.env.*
+!.env.example
+
+# The BFCL checkout is cloned by setup.sh, not vendored
+gorilla/
+.venv/
+venv/
+
+# Run outputs (setup.sh and run_baseline.py write here)
+capstone_run/
+test_case_ids_to_generate.json
+test_case_ids_to_generate.json.capstone-backup
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# OS
+.DS_Store
+.claude

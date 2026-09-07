@@ -1,0 +1,85 @@
+--- repro/qwen.py.orig	2026-09-06 07:18:08
++++ gorilla/berkeley-function-call-leaderboard/bfcl_eval/model_handler/api_inference/qwen.py	2026-09-06 07:18:08
+@@ -62,7 +62,12 @@
+         reasoning_content = ""
+         answer_content = ""
+         tool_info = []
++        usage = None
+         for chunk in api_response:
++            # Some OpenAI-compatible servers (e.g. vLLM) do not always put usage on
++            # the final chunk, so remember the last chunk that carried it.
++            if getattr(chunk, "usage", None) is not None:
++                usage = chunk.usage
+             if not chunk.choices:
+                 continue
+ 
+@@ -98,9 +103,13 @@
+                             + tool_call.function.arguments
+                         )
+ 
++        # A slot may stay empty if the server skips an index; a no-argument call may
++        # never emit an "arguments" delta at all.
++        tool_info = [item for item in tool_info if item.get("name")]
++
+         tool_call_ids = []
+         for item in tool_info:
+-            tool_call_ids.append(item["id"])
++            tool_call_ids.append(item.get("id", ""))
+ 
+         if len(tool_info) > 0:
+             # Build tool_calls structure required by OpenAI-compatible API
+@@ -108,16 +117,18 @@
+             for item in tool_info:
+                 tool_calls_for_history.append(
+                     {
+-                        "id": item["id"],
++                        "id": item.get("id", ""),
+                         "type": "function",
+                         "function": {
+                             "name": item["name"],
+-                            "arguments": item["arguments"],
++                            "arguments": item.get("arguments") or "{}",
+                         },
+                     }
+                 )
+ 
+-            model_response = [{item["name"]: item["arguments"]} for item in tool_info]
++            model_response = [
++                {item["name"]: item.get("arguments") or "{}"} for item in tool_info
++            ]
+             model_response_message_for_chat_history = {
+                 "role": "assistant",
+                 "content": None,
+@@ -142,8 +153,8 @@
+             "reasoning_content": reasoning_content,
+             "tool_call_ids": tool_call_ids,
+             # chunk is the last chunk of the stream response
+-            "input_token": chunk.usage.prompt_tokens,
+-            "output_token": chunk.usage.completion_tokens,
++            "input_token": usage.prompt_tokens if usage else 0,
++            "output_token": usage.completion_tokens if usage else 0,
+         }
+ 
+         if not reasoning_content:
+@@ -175,7 +186,10 @@
+ 
+         reasoning_content = ""
+         answer_content = ""
++        usage = None
+         for chunk in api_response:
++            if getattr(chunk, "usage", None) is not None:
++                usage = chunk.usage
+             if not chunk.choices:
+                 continue
+ 
+@@ -195,8 +209,8 @@
+             },
+             "reasoning_content": reasoning_content,
+             # chunk is the last chunk of the stream response
+-            "input_token": chunk.usage.prompt_tokens,
+-            "output_token": chunk.usage.completion_tokens,
++            "input_token": usage.prompt_tokens if usage else 0,
++            "output_token": usage.completion_tokens if usage else 0,
+         }
+ 
+         # Attach reasoning content to the assistant message for the next turn if present

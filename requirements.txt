@@ -1,0 +1,3 @@
+# analyze_failures.py and run_baseline.py use only the Python standard library.
+# The heavy dependencies belong to bfcl_eval, installed into its own venv by setup.sh.
+# Python >= 3.10 required (BFCL constraint).
