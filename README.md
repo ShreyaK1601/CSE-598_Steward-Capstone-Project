@@ -3,8 +3,10 @@
 CSE 598 Agentic AI capstone. This repository holds the project plan, the measured baseline and
 the code needed to reproduce it, and will hold the Steward agent as it is built.
 
-**Status:** Milestone 1 (discovery) complete. The refined scope, design and evaluation plan below
-were reviewed with the stakeholder on October 1, 2026. Next: Milestone 2, the first prototype.
+**Status:** Working prototype in `steward/`, evaluated against three baselines on four datasets
+(`runs/summary.md`). The refined scope, design and evaluation plan below were reviewed with the
+stakeholder on October 1, 2026. Preliminary results are below the 60% completion target on held-out
+and missing-information cases, and the zero unintended-mutation gate is not yet met.
 
 Steward is an agent that carries out multi-step operations on a team's working systems from a
 natural language request, across files, tickets, and messaging. Because those operations are
@@ -125,11 +127,55 @@ completed, and at least 9 of 10 plans approved without the stakeholder asking wh
 
 ## Next steps
 
-- [ ] Complete B0 on `miss_func`, `miss_param` and `long_context`, three seeds each
-- [ ] Instrument silent wrong success
-- [ ] Implement baselines B1 and B2
-- [ ] Implement the preflight guard and the end-of-turn verifier (neither changes prompts)
+- [x] Instrument silent wrong success (LLM judge, `steward/judge.py`)
+- [x] Implement baselines B1 and B2
+- [x] Implement the preflight guard and the end-of-turn verifier
+- [ ] Complete the two-person hand check of the judge's labels
+- [ ] Fix the verifier checking only the planner's own item list (a missed March run was reported as verified)
+- [ ] Ask instead of guessing on ambiguous requests (`multi_turn_labops_3` moved extra runs)
 - [ ] Receive the mirrored directory listing and ten example requests from the stakeholder
+
+## Steward: setup and run
+
+After `./setup.sh` and adding the key (Path B below), run from the repository root:
+
+```bash
+export PYTHONPATH=.
+PY=../gorilla/berkeley-function-call-leaderboard/.venv/bin/python
+
+# Offline tests, no key needed
+$PY tests/test_mechanisms.py
+
+# Command line on the lab sandbox: dry run, then execute with approval
+$PY -m steward.cli "Consolidate the March runs into a new folder called 2026-03 inside scratch."
+$PY -m steward.cli --approve "Consolidate the March runs into a new folder called 2026-03 inside scratch."
+
+# Evaluation: run, score, summarize, judge
+$PY -m steward.evaluate run --datasets d1,d2 --systems b0,b1,b2,steward_norollback --repeats 0,1,2 --threads 10
+$PY -m steward.evaluate run --datasets d1h,d3 --systems b0,b1,b2,steward_norollback --repeats 0 --threads 10
+$PY -m steward.evaluate score
+$PY -m steward.evaluate summary
+$PY -m steward.judge
+```
+
+| Dataset | Cases | Source |
+|---|---|---|
+| `d1` | 38 | BFCL `multi_turn_base`, ops trio only (used during development) |
+| `d1h` | 30 | Held-out sample of the other `multi_turn_base` cases, seed 598 |
+| `d2` | 10 | Lab operations sandbox, requests written by the team as a stand-in for the stakeholder's |
+| `d3` | 38 | BFCL `multi_turn_miss_param`, ops trio only |
+
+| System | Description |
+|---|---|
+| `b0`, `b1`, `b2` | Baselines, as described below |
+| `steward_norollback` | Steward as decided: on a failed check it stops, reports, and leaves changes in place |
+| `steward` | Steward with automatic undo on a failed check, kept for comparison |
+
+On the command line, a failed check stops and asks before undoing anything. The evaluator has no
+person to ask, so it uses the two policies above. `runs/code_freeze.txt` holds the hashes of the code
+the reported runs used (`shasum -a 256 -c runs/code_freeze.txt`); `steward/agent.py` and
+`steward/cli.py` changed afterwards to add the undo prompt, which the evaluator never enables.
+Raw traces (`runs/raw/`) are not committed; scored tables and judge labels are.
 
 ---
 
@@ -244,6 +290,11 @@ this baseline should hold the model fixed so that gains are attributable to the 
 | `examples/multi_turn_20.json` | The default 20-case slice |
 | `.env.example` | Template for the two required environment variables |
 | `docs/milestone-1/architecture.png` | Planned Steward architecture (Milestone 1) |
+| `steward/` | Steward agent, baselines, datasets, evaluation, judge and command line |
+| `tests/test_mechanisms.py` | Offline tests with a scripted model |
+| `scripts/handcheck.py` | Builds blind hand-check forms and compares two raters' labels |
+| `runs/` | Scored results, judge labels, summary and code freeze record |
+| `docs/development-notes.md` | Development findings and the undo-on-approval decision |
 
 **Input:** the BFCL dataset, installed with `bfcl_eval`, with no separate download.
 **Output:** `<bfcl-root>/capstone_run/result/` for raw traces and `capstone_run/score/` for scores.
