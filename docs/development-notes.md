@@ -1,5 +1,12 @@
 # Development findings (D1 dev slice only)
 
+## Decision: undo only on approval
+
+When the end-of-turn check fails after the one repair, Steward stops, reports what is unmet, and offers to undo the
+turn's changes. Nothing is undone without approval, because a false alarm from the check can otherwise destroy correct work.
+The command line follows this policy. The evaluator has no person to ask, so `steward_norollback` measures the
+decided policy (stop, report, leave changes in place), and `steward` measures automatic undo for comparison.
+
 ## Smoke run, first version: rollback on a planner typo (multi_turn_base_2)
 
 Turn 4 asked for TeamNotes.txt to be copied to Archived as IdeasArchive.txt. The executor did this correctly.

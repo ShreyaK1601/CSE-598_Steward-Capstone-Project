@@ -90,7 +90,7 @@ roles. Deterministic components check its work:
 | Error triage | Classifies tool errors (missing path, bad argument, unmet precondition, auth, transient) and applies a matching repair |
 | Mutation journal | Records every write with its inverse and whether Steward created the item |
 | End-of-turn verifier | Runs in a fresh context; compares the probed state with the expected effects |
-| Rollback | On an unrepaired mismatch, applies the inverses in reverse order to items Steward created |
+| Undo on approval | On an unrepaired mismatch, stops and reports; if the person approves, applies the inverses in reverse order to items Steward created |
 
 Steward will be implemented as a custom BFCL model handler, so the unmodified BFCL evaluator scores
 it exactly as it scores the baseline.
