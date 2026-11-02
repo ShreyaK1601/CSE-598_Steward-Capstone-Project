@@ -77,6 +77,7 @@ class Config:
     empty_reprompt: bool = False
     naive_retry: int = 0
     approve: Optional[Callable] = None
+    confirm_undo: Optional[Callable] = None
     on_event: Optional[Callable] = None
 
 
@@ -395,7 +396,7 @@ class StewardHandler(ReliableHandler):
         verdict = "verified" if checked and not unmet else "unverified"
         if unmet:
             verdict = "partial"
-            if cfg.rollback and journal:
+            if journal and (cfg.rollback or (cfg.confirm_undo and cfg.confirm_undo(unmet, journal))):
                 undone, stuck = self._rollback(journal, ctx, start_cwd)
                 if undone:
                     stats["rollbacks"] += 1

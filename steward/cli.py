@@ -43,6 +43,18 @@ def printer(kind, data):
         print(f"\nREPORT [{report['verdict']}]\n  {report['text'] or '; '.join(report['changes']) or 'no changes'}")
 
 
+def confirm_undo(unmet, journal):
+    """Stop on a failed check: show what is wrong and undo only if the person approves."""
+    print(f"\nCHECK FAILED. Unmet: {json.dumps(unmet)}")
+    print("Changes this turn:")
+    for entry in journal:
+        print(f"  {entry['call']}" + ("" if entry["undo"] else "  (cannot be undone)"))
+    try:
+        return input("Undo these changes? [y/N] ").strip().lower() == "y"
+    except EOFError:
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("requests", nargs="+", help="one request per conversation turn")
@@ -63,7 +75,8 @@ def main():
         "path": [],
     }
     populate_test_cases_with_predefined_functions([entry])
-    config = agent.Config(**agent.STEWARD, approve=approve, on_event=printer)
+    settings = dict(agent.STEWARD, rollback=False)
+    config = agent.Config(**settings, approve=approve, confirm_undo=confirm_undo, on_event=printer)
     handler = agent.StewardHandler(f"cli_{args.session}", config)
     print("=" * 72)
     for number, text in enumerate(args.requests):

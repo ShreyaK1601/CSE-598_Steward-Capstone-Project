@@ -73,6 +73,35 @@ class Mechanisms(unittest.TestCase):
         self.assertNotIn("x.txt", names)
         self.assertIn("ideas.txt", names)
 
+    def run_failed_check(self, name, answer):
+        plan = {"clarify": None, "summary": [], "aliases": {},
+                "effects": [{"type": "absent", "path": "ideas.txt"}]}
+        asked = []
+
+        def confirm(unmet, journal):
+            asked.append(len(journal))
+            return answer
+
+        h = Scripted(name, agent.Config(preflight=True, halt_batch=True, plan=True, verify=True,
+                                        confirm_undo=confirm),
+                     ["[cd(folder='documents'), touch(file_name='x.txt')]", "", "", ""], [plan])
+        _, meta = h.inference_multi_turn_prompting(entry(), False, True)
+        fs = self.fs_state(name)
+        fs.cd("documents")
+        return asked, meta["steward"]["reports"][0], fs.ls()["current_directory_content"]
+
+    def test_failed_check_keeps_changes_when_undo_is_declined(self):
+        asked, report, names = self.run_failed_check("t_keep", False)
+        self.assertEqual(asked, [1])
+        self.assertEqual(report["verdict"], "partial")
+        self.assertIn("x.txt", names)
+
+    def test_failed_check_undoes_changes_when_approved(self):
+        asked, report, names = self.run_failed_check("t_undo", True)
+        self.assertEqual(asked, [1])
+        self.assertEqual(report["verdict"], "rolled_back")
+        self.assertNotIn("x.txt", names)
+
     def test_deletion_not_requested_is_refused(self):
         h = Scripted("t_del", agent.Config(preflight=True, halt_batch=True),
                      ["[cd(folder='documents')]", "[rm(file_name='ideas.txt')]", ""])
