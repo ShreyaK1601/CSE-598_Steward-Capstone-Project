@@ -21,3 +21,7 @@ __pycache__/
 # OS
 .DS_Store
 .claude
+
+# Raw traces can be regenerated and may be large; scored tables are kept
+runs/raw/
+dev_runs/
