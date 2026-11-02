@@ -1,0 +1,11 @@
+id,passed,error_type,tool_calls,tool_errors,blocked,skipped,probes,repairs,rollbacks,input_tokens,output_tokens,llm_seconds,wall_seconds,unintended,residue,empty_gt_turns,guessed_turns,verdicts
+multi_turn_labops_0,0,multi_turn:instance_state_mismatch,9,3,0,0,0,0,0,37717,193,59.02,59.04,0,0,0,0,unverified|unverified
+multi_turn_labops_1,0,multi_turn:empty_turn_model_response,5,1,0,0,0,0,0,30095,65,50.46,50.47,0,0,0,0,unverified|unverified
+multi_turn_labops_2,1,,11,3,0,0,0,0,0,28406,173,68.64,68.65,0,0,0,0,unverified|unverified
+multi_turn_labops_3,1,,10,3,0,0,0,0,0,26376,96,55.81,55.82,0,0,1,0,unverified|unverified
+multi_turn_labops_4,0,multi_turn:instance_state_mismatch,9,3,0,0,0,0,0,35118,104,68.17,68.18,0,1,0,0,unverified
+multi_turn_labops_5,0,multi_turn:instance_state_mismatch,7,3,0,0,0,0,0,17291,76,50.48,50.49,0,2,0,0,unverified
+multi_turn_labops_6,0,multi_turn:force_terminated,71,36,0,0,0,0,0,118912,566,234.07,234.11,0,4,0,0,unverified
+multi_turn_labops_7,1,,8,4,0,0,0,0,0,27022,86,66.02,66.03,0,0,1,0,unverified|unverified
+multi_turn_labops_8,0,multi_turn:instance_state_mismatch,3,0,0,0,0,0,0,17318,128,36.7,36.71,0,0,0,0,unverified|unverified
+multi_turn_labops_9,1,,5,1,0,0,0,0,0,21425,99,28.12,28.13,0,0,0,0,unverified|unverified

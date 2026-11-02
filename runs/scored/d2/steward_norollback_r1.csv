@@ -1,0 +1,11 @@
+id,passed,error_type,tool_calls,tool_errors,blocked,skipped,probes,repairs,rollbacks,input_tokens,output_tokens,llm_seconds,wall_seconds,unintended,residue,empty_gt_turns,guessed_turns,verdicts
+multi_turn_labops_0,1,,6,0,0,0,12,0,0,30090,739,50.15,96.48,0,0,0,0,verified|verified
+multi_turn_labops_1,1,,3,0,0,0,9,0,0,20476,376,48.72,65.4,0,0,0,0,verified|verified
+multi_turn_labops_2,1,,3,0,0,0,9,0,0,19745,361,28.9,45.44,0,0,0,0,verified|verified
+multi_turn_labops_3,0,multi_turn:empty_turn_model_response,7,0,0,0,13,0,0,16769,683,32.17,77.03,8,8,1,1,verified|unverified
+multi_turn_labops_4,1,,3,0,2,2,8,0,0,24369,217,57.18,69.96,0,0,0,0,verified
+multi_turn_labops_5,1,,3,0,1,0,7,0,0,14528,158,24.54,31.58,0,0,0,0,verified
+multi_turn_labops_6,1,,4,0,2,0,12,0,0,40369,311,62.15,68.57,0,0,0,0,verified|verified
+multi_turn_labops_7,1,,3,0,2,2,12,1,0,37837,428,74.01,93.91,0,0,1,0,partial|verified
+multi_turn_labops_8,0,multi_turn:instance_state_mismatch,3,0,0,0,9,0,0,24925,349,57.01,79.27,0,0,0,0,verified|verified
+multi_turn_labops_9,1,,4,0,0,0,10,0,0,20306,270,23.12,43.58,0,0,0,0,unverified|verified
