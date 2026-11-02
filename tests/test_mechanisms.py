@@ -42,7 +42,7 @@ class Mechanisms(unittest.TestCase):
             [], case["initial_config"], case["involved_classes"], name, case_id)
         return instances["GorillaFileSystem"]
 
-    def test_halt_prevents_the_stray_file_from_the_milestone_1_failure(self):
+    def test_halt_prevents_the_stray_file_after_a_failed_cd(self):
         # The model's batch mistypes the folder, then creates the file.
         h = Scripted("t_halt", agent.Config(preflight=True, halt_batch=True),
                      ["[cd(folder='document'), touch(file_name='TeamNotes.txt')]", ""])
