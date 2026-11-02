@@ -82,6 +82,7 @@ class Config:
 
 STEWARD = dict(state_brief=True, preflight=True, halt_batch=True, triage=True, plan=True,
                clarify=True, verify=True, rollback=True, empty_reprompt=True)
+B2 = dict(naive_retry=2)
 
 
 class StewardHandler(ReliableHandler):
@@ -417,9 +418,58 @@ class StewardHandler(ReliableHandler):
                 "unmet": unmet, "stuck": stuck}
 
 
+class OpenLoopHandler(ReliableHandler):
+    """B1: one model call per turn, full call sequence, no observation of results."""
+
+    def inference_multi_turn_prompting(self, test_entry, include_input_log, exclude_state_log):
+        config = test_entry.get("initial_config", {})
+        classes = test_entry["involved_classes"]
+        holdout = test_entry.get("missed_function", {})
+        inference_data = self._pre_query_processing_prompting(test_entry)
+        all_response, all_log, input_tokens, output_tokens, latency = [], [], [], [], []
+        for turn_idx, message in enumerate(test_entry["question"]):
+            if str(turn_idx) in holdout:
+                message = [{"role": "user",
+                            "content": DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_PROMPTING.format(
+                                functions=holdout[str(turn_idx)])}]
+            message = deepcopy(message)
+            if turn_idx == 0:
+                message[-1]["content"] += (
+                    "\n\nInitial system state:\n" + json.dumps(config) +
+                    "\n\nWrite the complete sequence of calls for each request in one response. "
+                    "You will not see their results.")
+            inference_data["message"].extend(message)
+            api_response, query_latency = self._query_prompting(inference_data)
+            data = self._parse_query_response_prompting(api_response)
+            raw = data["model_responses"]
+            inference_data = self._add_assistant_message_prompting(inference_data, data)
+            log = {"begin_of_turn_query": message, "step_0": [{"role": "assistant", "content": raw}]}
+            try:
+                calls = self.decode_execute(raw, has_tool_call_tag=False)
+            except Exception:
+                calls = []
+            if calls and not is_empty_execute_response(calls):
+                results, _ = execute_multi_turn_func_call(
+                    calls, config, classes, self.model_name_underline_replaced,
+                    test_entry["id"], long_context=False, is_evaL_run=False)
+                log["step_0"].extend({"role": "tool", "content": r} for r in results)
+            all_response.append([raw])
+            all_log.append(log)
+            input_tokens.append([data["input_token"]])
+            output_tokens.append([data["output_token"]])
+            latency.append([query_latency])
+        return all_response, {"input_token_count": input_tokens, "output_token_count": output_tokens,
+                              "latency": latency, "inference_log": all_log,
+                              "steward": {"endpoint_retries": self.endpoint_retries}}
+
+
 def make_handler(system, run_name, seed=None):
     if system == "b0":
         return ReliableHandler(run_name, seed)
+    if system == "b1":
+        return OpenLoopHandler(run_name, seed)
+    if system == "b2":
+        return StewardHandler(run_name, Config(**B2), seed)
     if system == "steward":
         return StewardHandler(run_name, Config(**STEWARD), seed)
     if system == "steward_norollback":
