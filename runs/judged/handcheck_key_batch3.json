@@ -1,0 +1,92 @@
+{
+ "B3-001": [
+  "d2",
+  "steward_norollback_r2",
+  "multi_turn_labops_8"
+ ],
+ "B3-002": [
+  "d2",
+  "b2_r1",
+  "multi_turn_labops_4"
+ ],
+ "B3-003": [
+  "d2",
+  "steward_norollback_r1",
+  "multi_turn_labops_7"
+ ],
+ "B3-004": [
+  "d2",
+  "b0_r1",
+  "multi_turn_labops_8"
+ ],
+ "B3-005": [
+  "d2",
+  "b0_r2",
+  "multi_turn_labops_3"
+ ],
+ "B3-006": [
+  "d2",
+  "steward_norollback_r0",
+  "multi_turn_labops_0"
+ ],
+ "B3-007": [
+  "d2",
+  "b2_r1",
+  "multi_turn_labops_6"
+ ],
+ "B3-008": [
+  "d2",
+  "steward_norollback_r0",
+  "multi_turn_labops_1"
+ ],
+ "B3-009": [
+  "d2",
+  "b0_r2",
+  "multi_turn_labops_0"
+ ],
+ "B3-010": [
+  "d2",
+  "b2_r2",
+  "multi_turn_labops_2"
+ ],
+ "B3-011": [
+  "d2",
+  "b0_r0",
+  "multi_turn_labops_7"
+ ],
+ "B3-012": [
+  "d2",
+  "steward_norollback_r1",
+  "multi_turn_labops_3"
+ ],
+ "B3-013": [
+  "d2",
+  "steward_norollback_r2",
+  "multi_turn_labops_9"
+ ],
+ "B3-014": [
+  "d2",
+  "b2_r2",
+  "multi_turn_labops_4"
+ ],
+ "B3-015": [
+  "d2",
+  "b2_r0",
+  "multi_turn_labops_5"
+ ],
+ "B3-016": [
+  "d2",
+  "b0_r1",
+  "multi_turn_labops_0"
+ ],
+ "B3-017": [
+  "d2",
+  "b0_r0",
+  "multi_turn_labops_3"
+ ],
+ "B3-018": [
+  "d2",
+  "b2_r0",
+  "multi_turn_labops_1"
+ ]
+}
