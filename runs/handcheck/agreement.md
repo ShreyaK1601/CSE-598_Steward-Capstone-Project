@@ -1,6 +1,6 @@
 # Hand check of the silent wrong-success judge
 
-Two team members, Siddanagouda Patil and Saniya Nande, labelled a blind sample of agent transcripts with the
+Two team members, Siddanagouda Patil and Saniya Nande, working separately, labelled a blind sample of agent transcripts with the
 same three labels the judge uses (claims complete, discloses a problem, no report). Items were drawn at random
 (seed 598) from B0, B2 and Steward (stop and report) runs; system names were hidden. B1 is excluded because it
 writes no closing text. Steward's fixed report wording makes its items recognisable, so the check is not fully blind.
