@@ -121,8 +121,8 @@ class StewardHandler(ReliableHandler):
             stats["planner_output_tokens"] += response.usage.completion_tokens
         return planner.parse_plan(response.choices[0].message.content)
 
-    def _run_batch(self, calls, instances_ctx, turn_text, journal, created, stats):
-        """Run one model step. Returns (results, executed calls, instances)."""
+    def _run_batch(self, calls, instances_ctx, turn_text, journal, created, stats, prev_text=""):
+        """Run one model step. Returns (results, executed calls)."""
         results, executed = [], []
         instances = instances_ctx["instances"]
         halted = False
@@ -135,19 +135,20 @@ class StewardHandler(ReliableHandler):
             name, args, owner = specs.parse_call(call, instances)
             if self.cfg.preflight and name:
                 stats["probes"] += 1
-                reason = specs.preflight(name, args, owner, instances, turn_text, created)
+                reason = specs.preflight(name, args, owner, instances, turn_text, created, prev_text)
                 if reason:
                     stats["blocked"] += 1
                     self.emit("blocked", call=call, reason=reason)
                     results.append(json.dumps({"error": f"Preflight blocked, not executed: {reason}"}))
                     halted = self.cfg.halt_batch
                     continue
-            undo, new_name = (None, None)
+            undo, new_name, made = (None, None, [])
             if name in specs.MUTATING and args is not None:
                 try:
                     undo, new_name = specs.inverse(name, args, instances)
+                    made = specs.made_by_call(name, args, instances, created, new_name)
                 except (KeyError, TypeError):
-                    undo, new_name = None, None
+                    undo, new_name, made = None, None, []
             at = probes.cwd(instances)
             output, instances = self._execute([call], instances_ctx)
             instances_ctx["instances"] = instances
@@ -165,8 +166,7 @@ class StewardHandler(ReliableHandler):
             elif name in specs.MUTATING:
                 journal.append({"call": call, "cwd": at, "undo": undo,
                                 "provenance": "created" if new_name else "pre-existing"})
-                if new_name:
-                    created.add(new_name)
+                created.update(made)
             results.append(result)
         return results, executed
 
@@ -214,7 +214,7 @@ class StewardHandler(ReliableHandler):
                  "planner_input_tokens": 0, "planner_output_tokens": 0, "repairs": 0,
                  "reprompts": 0, "rollbacks": 0}
         input_tokens, output_tokens, latency, all_response, all_log = [], [], [], [], []
-        reports, history, aliases, created = [], [], {}, set()
+        reports, history, aliases, created, requests = [], [], {}, set(), []
         carry_note = ""
         force_quit = False
 
@@ -227,6 +227,10 @@ class StewardHandler(ReliableHandler):
                                 functions=holdout[str(turn_idx)])}]
             message = deepcopy(message)
             request = " ".join(m["content"] for m in message if m["role"] == "user")
+            prev_request = requests[-1] if requests else ""
+            if str(turn_idx) not in holdout:
+                # A turn that only supplies new tool docs is not the user's request.
+                requests.append(request)
             before = probes.snapshot(ctx["instances"])
             start_cwd = probes.cwd(ctx["instances"])
             turn_response, turn_in, turn_out, turn_latency = [], [], [], []
@@ -341,7 +345,7 @@ class StewardHandler(ReliableHandler):
 
                 data["model_responses_decoded"] = calls
                 results, executed = self._run_batch(
-                    calls, ctx, request, journal, created, stats)
+                    calls, ctx, request, journal, created, stats, prev_request)
                 turn_calls += len(executed)
                 turn_response.append("[" + ", ".join(executed) + "]" if executed else "")
                 step_log.append({"role": "handler_log", "content": "decoded",

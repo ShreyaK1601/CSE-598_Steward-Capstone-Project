@@ -9,11 +9,15 @@ import difflib
 import inspect
 import re
 
+from steward import probes
+
 DELETE_WORDS = re.compile(
     r"\b(delet\w*|remov\w*|rm|eras\w*|discard\w*|clean\w*|purg\w*|get rid|trash\w*|"
     r"wip\w*|tidy\w*|dispos\w*|shred\w*|eliminat\w*|retract\w*|withdraw\w*|clear\w*)\b",
     re.I,
 )
+
+NEW_FILE_WORDS = re.compile(r"\b(new|creat\w*|draft\w*|start\w*|set up|make)\b", re.I)
 
 MUTATING = {
     "touch", "mkdir", "echo", "mv", "cp", "rm", "rmdir",
@@ -126,20 +130,93 @@ CHECKS = {
 }
 
 
-def preflight(name, args, owner, instances, turn_text, created):
+def named(item, text):
+    """True if the request names this item, by full name or by its name without extension."""
+    item = str(item).strip("/").rsplit("/", 1)[-1]
+    stem = item.split(".", 1)[0]
+    for word in {item, stem}:
+        if len(word) >= 3 and re.search(rf"(?<![\w.]){re.escape(word)}(?![\w])", text, re.I):
+            return True
+    return False
+
+
+def deletion_requested(target, folders, turn_text, prev_text):
+    """A pre-existing item may be deleted only if the user asked to delete that item.
+
+    The delete word and the item's name, or the name of a folder holding it ("delete the files in
+    Drafts"), must both come from the user: in the current request, or, when the current request
+    is only an answer (no delete word of its own), across it and the request before it.
+    "Remove it" alone names nothing, so it does not permit deletion.
+    """
+    if DELETE_WORDS.search(turn_text):
+        text = turn_text
+    elif DELETE_WORDS.search(prev_text):
+        text = turn_text + " " + prev_text
+    else:
+        return False
+    return any(named(item, text) for item in [target, *folders])
+
+
+def overwrite_reason(args, instances, turn_text, prev_text, created):
+    """Refuse to replace the content of a user's existing file unless the user asked for it."""
+    fs = instances.get("GorillaFileSystem")
+    target = args.get("file_name")
+    if fs is None or not target or target in created or target not in _names(fs):
+        return None
+    if not str(fs.cat(target).get("file_content", "")).strip():
+        return None
+    if NEW_FILE_WORDS.search(turn_text):
+        return (f"refused: '{target}' already exists with content, and the request asks for a new "
+                f"file. Writing would replace the existing content. Ask the user how to proceed.")
+    if not named(target, turn_text + " " + prev_text):
+        return (f"refused: writing would replace the existing content of '{target}', which the "
+                f"user did not name. Ask the user which file to write to.")
+    return None
+
+
+def preflight(name, args, owner, instances, turn_text, created, prev_text=""):
     """Return why this call must not run, or None. Uses read-only calls only."""
     if owner not in CHECKS:
         return None
     # Deleting data the user did not ask to delete is the stakeholder's critical failure.
-    if name in ("rm", "rmdir", "delete_message"):
-        target = args.get("file_name", args.get("dir_name", args.get("receiver_id")))
-        if target not in created and not DELETE_WORDS.search(turn_text):
-            return (f"refused: {name} of '{target}', which Steward did not create, "
-                    f"was not requested by the user.")
+    if name == "delete_message":
+        if not DELETE_WORDS.search(turn_text):
+            return "refused: deleting a message was not requested by the user."
+    elif name in ("rm", "rmdir"):
+        target = args.get("file_name", args.get("dir_name"))
+        fs = instances.get("GorillaFileSystem")
+        folders = fs.pwd()["current_working_directory"].strip("/").split("/")[1:] if fs else []
+        if target not in created:
+            if not deletion_requested(target, folders, turn_text, prev_text):
+                return (f"refused: {name} of '{target}', which Steward did not create and the user "
+                        f"did not name for deletion. Ask the user which item to delete.")
+            places = [p for p in probes.walk_fs(fs) if p.rsplit("/", 1)[-1] == target] if fs else []
+            text = turn_text + " " + prev_text
+            if len(places) > 1 and not any(named(f, text) for f in folders):
+                return (f"refused: '{target}' exists in {len(places)} places ({', '.join(places)}) "
+                        f"and the user did not say which folder. Ask the user which one to delete.")
+    elif name == "echo":
+        reason = overwrite_reason(args, instances, turn_text, prev_text, created)
+        if reason:
+            return reason
     try:
         return CHECKS[owner](name, args, instances[owner])
     except (TypeError, ValueError, KeyError):
         return None
+
+
+def made_by_call(name, args, instances, created, new_name):
+    """Names this call makes Steward's own if it succeeds. Call before executing it.
+
+    Items Steward created, or renamed from items it created, are not the user's existing data,
+    so later edits to them are not refused.
+    """
+    names = [new_name] if new_name else []
+    if name == "mv" and args.get("source") in created:
+        fs = instances.get("GorillaFileSystem")
+        if fs is not None and not _is_dir(fs, args.get("destination", "")):
+            names.append(args["destination"])
+    return names
 
 
 def inverse(name, args, instances):

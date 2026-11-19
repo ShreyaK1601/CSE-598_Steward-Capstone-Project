@@ -7,7 +7,7 @@ from steward import bfcl_env  # noqa: F401
 from bfcl_eval.eval_checker.eval_runner import _evaluate_single_multi_turn_entry
 from bfcl_eval.utils import load_dataset_entry, load_ground_truth_entry
 
-from steward import agent, verifier
+from steward import agent, specs, verifier
 
 
 class Scripted(agent.StewardHandler):
@@ -149,6 +149,68 @@ class Mechanisms(unittest.TestCase):
         ], "copy to IdeasArchive.txt and write keep this exact text inside", {"/a/run_1": None})
         self.assertEqual([e.get("text", e.get("path", e["type"])) for e in kept],
                          ["/a/IdeasArchive.txt", "/a/run_1", "keep this exact text", "ticket_status"])
+
+
+class Guard(unittest.TestCase):
+    """The unintended changes observed in the Milestone 2 runs, replayed against the guard."""
+
+    def state(self, dataset, case_id, calls=()):
+        from bfcl_eval.eval_checker.multi_turn_eval.multi_turn_utils import execute_multi_turn_func_call
+        from steward.dataset import DATASETS
+        case = {e["id"]: e for e in DATASETS[dataset]()[0]}[case_id]
+        tag = f"g_{case_id}_{len(calls)}"
+        _, instances = execute_multi_turn_func_call(
+            list(calls), case["initial_config"], case["involved_classes"], tag, case_id)
+        return case, instances
+
+    def check(self, instances, call, text, prev="", created=()):
+        name, args, owner = specs.parse_call(call, instances)
+        return specs.preflight(name, args, owner, instances, text, set(created), prev)
+
+    def test_remove_it_does_not_delete_a_file_never_named(self):
+        # base_41: "removing it" meant the message; Steward deleted the notes file.
+        case, inst = self.state("d1", "multi_turn_base_41", ["cd(folder='initial_directory')"])
+        texts = [q[-1]["content"] for q in case["question"]]
+        self.assertIn("refused", self.check(inst, "rm(file_name='notes')", texts[1], texts[0]))
+
+    def test_unnamed_folder_is_not_deleted(self):
+        # miss_param_38: "remove it and the directory" before the folder was named.
+        case, inst = self.state("d3", "multi_turn_miss_param_38")
+        text = case["question"][0][-1]["content"]
+        self.assertIn("refused", self.check(inst, "rmdir(dir_name='BackupResearch')", text))
+
+    def test_same_name_in_several_folders_asks_which(self):
+        case, inst = self.state("d3", "multi_turn_miss_param_38", ["cd(folder='BackupResearch')"])
+        text = case["question"][0][-1]["content"]
+        reason = self.check(inst, "rm(file_name='findings_report')", text)
+        self.assertIn("places", reason)
+
+    def test_named_file_in_named_folder_may_be_deleted(self):
+        case, inst = self.state("d3", "multi_turn_miss_param_38", ["cd(folder='SuperResearch')"])
+        texts = [q[-1]["content"] for q in case["question"]]
+        self.assertIsNone(self.check(inst, "rm(file_name='findings_report')", texts[1], texts[0]))
+
+    def test_files_inside_a_named_folder_may_be_deleted(self):
+        case, inst = self.state("d1", "multi_turn_base_46", ["cd(folder='Drafts')"])
+        text = case["question"][0][-1]["content"]
+        self.assertIsNone(self.check(inst, "rm(file_name='DylanProject.txt')", text))
+
+    def test_new_file_request_does_not_overwrite_an_existing_one(self):
+        # base_10: asked for a new notes.md; Steward overwrote the existing one.
+        case, inst = self.state("d1", "multi_turn_base_10", ["cd(folder='workspace')"])
+        text = case["question"][2][-1]["content"]
+        self.assertIn("refused", self.check(inst, "echo(content='x', file_name='notes.md')", text))
+
+    def test_unnamed_existing_file_is_not_overwritten(self):
+        # miss_param_2: asked to draft a document; Steward wrote over ideas.txt.
+        case, inst = self.state("d3", "multi_turn_miss_param_2", ["cd(folder='documents')"])
+        text = case["question"][0][-1]["content"]
+        self.assertIn("refused", self.check(inst, "echo(content='x', file_name='ideas.txt')", text))
+
+    def test_writing_into_a_file_steward_created_is_allowed(self):
+        case, inst = self.state("d3", "multi_turn_miss_param_2", ["cd(folder='documents')"])
+        self.assertIsNone(self.check(inst, "echo(content='x', file_name='ideas.txt')",
+                                     "write x into the new file", created={"ideas.txt"}))
 
 
 if __name__ == "__main__":
