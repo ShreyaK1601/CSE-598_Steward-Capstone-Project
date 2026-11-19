@@ -148,6 +148,24 @@ def plan_prompt(history, aliases, state, tools, request):
     )
 
 
+def irreversible(plan):
+    """Moves in the plan that the tools cannot undo: an item leaving its folder for another one.
+
+    The file tools cannot name a parent folder as a destination, so such a move has no inverse.
+    """
+    gone = {str(e.get("path", "")).rstrip("/") for e in plan.get("effects", []) if e.get("type") == "absent"}
+    moves = []
+    for effect in plan.get("effects", []):
+        if effect.get("type") != "exists":
+            continue
+        new = str(effect.get("path", "")).rstrip("/")
+        name = new.rsplit("/", 1)[-1]
+        for old in gone:
+            if old.rsplit("/", 1)[-1] == name and old.rsplit("/", 1)[0] != new.rsplit("/", 1)[0]:
+                moves.append(f"{old} -> {new.rsplit('/', 1)[0]}/")
+    return sorted(moves)
+
+
 ACTIONS = {"move", "copy", "delete"}
 
 

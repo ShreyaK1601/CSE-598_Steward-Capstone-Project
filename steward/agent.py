@@ -78,6 +78,7 @@ class Config:
     naive_retry: int = 0
     approve: Optional[Callable] = None
     confirm_undo: Optional[Callable] = None
+    confirm_irreversible: Optional[Callable] = None
     on_event: Optional[Callable] = None
 
 
@@ -157,6 +158,14 @@ class StewardHandler(ReliableHandler):
                     made = specs.made_by_call(name, args, instances, created, new_name)
                 except (KeyError, TypeError):
                     undo, new_name, made = None, None, []
+            if (self.cfg.confirm_irreversible and name in specs.MUTATING and undo is None
+                    and owner in specs.CHECKS and not self.cfg.confirm_irreversible(call)):
+                stats["declined"] = stats.get("declined", 0) + 1
+                self.emit("blocked", call=call, reason="declined: this change cannot be undone")
+                results.append(json.dumps({"error": "Not executed: the user declined a change that "
+                                                    "cannot be undone. Do not retry it; report this."}))
+                halted = True
+                continue
             at = probes.cwd(instances)
             output, instances = self._execute([call], instances_ctx)
             instances_ctx["instances"] = instances

@@ -12,7 +12,7 @@ import json
 import sys
 from copy import deepcopy
 
-from steward import agent
+from steward import agent, planner
 from steward.dataset import LAB_CONFIG, populate_test_cases_with_predefined_functions
 
 CLASSES = ["GorillaFileSystem", "TicketAPI", "MessageAPI"]
@@ -53,8 +53,41 @@ def confirm_undo(unmet, journal):
     print("Changes this turn:")
     for entry in journal:
         print(f"  {entry['call']}" + ("" if entry["undo"] else "  (cannot be undone)"))
+    return ask("Undo these changes? [y/N] ")
+
+
+class Irreversible:
+    """Warn before changes the tools cannot undo, separately from approving the plan.
+
+    The plan's moves are listed and confirmed once per turn when the plan is approved. A call
+    with no inverse that the plan did not list is confirmed on its own before it runs.
+    """
+
+    def __init__(self):
+        self.accepted = False
+
+    def plan(self, plan):
+        self.accepted = False
+        moves = planner.irreversible(plan)
+        if not moves:
+            return True
+        print("\nWARNING: these moves cannot be undone with the available tools:")
+        for move in moves:
+            print(f"  {move}")
+        self.accepted = ask("Make these moves anyway? [y/N] ")
+        return self.accepted
+
+    def call(self, call):
+        if self.accepted:
+            return True
+        print(f"\nWARNING: {call} cannot be undone with the available tools.")
+        self.accepted = ask("Run it anyway? [y/N] ")
+        return self.accepted
+
+
+def ask(prompt):
     try:
-        return input("Undo these changes? [y/N] ").strip().lower() == "y"
+        return input(prompt).strip().lower() == "y"
     except EOFError:
         return False
 
@@ -66,10 +99,18 @@ def main():
     parser.add_argument("--session", default="cli", help="name for this sandbox session")
     args = parser.parse_args()
 
-    def approve(_plan):
+    guard = Irreversible()
+
+    def approve(plan):
         if not args.approve:
+            moves = planner.irreversible(plan)
+            if moves:
+                print("\nWARNING: these moves cannot be undone with the available tools:")
+                for move in moves:
+                    print(f"  {move}")
             print("\nDRY RUN: nothing executed. Re-run with --approve to execute.")
-        return args.approve
+            return False
+        return guard.plan(plan)
 
     entry = {
         "id": f"multi_turn_cli_{args.session}",
@@ -80,7 +121,8 @@ def main():
     }
     populate_test_cases_with_predefined_functions([entry])
     settings = dict(agent.STEWARD, rollback=False)
-    config = agent.Config(**settings, approve=approve, confirm_undo=confirm_undo, on_event=printer)
+    config = agent.Config(**settings, approve=approve, confirm_undo=confirm_undo,
+                          confirm_irreversible=guard.call, on_event=printer)
     handler = agent.StewardHandler(f"cli_{args.session}", config)
     print("=" * 72)
     for number, text in enumerate(args.requests):

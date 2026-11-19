@@ -267,6 +267,52 @@ class CompleteVerification(unittest.TestCase):
         self.assertFalse(any("MessageAPI.inbox" in c for c in meta["steward"]["reports"][1]["changes"]))
 
 
+class IrreversibleWarning(unittest.TestCase):
+    MOVE = "[cd(folder='scratch'), mv(source='config.yaml', destination='archive')]"
+
+    def run_move(self, name, answer):
+        from steward.dataset import d2
+        case = next(e for e in d2()[0] if e["id"] == "multi_turn_labops_4")
+        asked = []
+
+        def confirm(call):
+            asked.append(call)
+            return answer
+
+        h = Scripted(name, agent.Config(preflight=True, halt_batch=True, confirm_irreversible=confirm),
+                     [self.MOVE, ""])
+        _, meta = h.inference_multi_turn_prompting(case, False, True)
+        return asked, meta
+
+    def test_declined_move_into_a_folder_does_not_run(self):
+        asked, meta = self.run_move("t_irr_no", False)
+        self.assertEqual(asked, ["mv(source='config.yaml', destination='archive')"])
+        self.assertEqual(meta["steward"]["stats"]["declined"], 1)
+        self.assertEqual(meta["steward"]["reports"][0]["changes"], [])
+
+    def test_approved_move_runs(self):
+        asked, meta = self.run_move("t_irr_yes", True)
+        self.assertEqual(len(asked), 1)
+        self.assertIn("created /lab/scratch/archive/config.yaml", meta["steward"]["reports"][0]["changes"])
+
+    def test_reversible_calls_are_not_questioned(self):
+        from steward.dataset import d2
+        case = next(e for e in d2()[0] if e["id"] == "multi_turn_labops_5")
+        asked = []
+        h = Scripted("t_irr_touch", agent.Config(preflight=True, confirm_irreversible=asked.append),
+                     ["[cd(folder='scratch'), touch(file_name='STATUS.txt')]", ""])
+        h.inference_multi_turn_prompting(case, False, True)
+        self.assertEqual(asked, [])
+
+    def test_plan_lists_moves_that_cannot_be_undone(self):
+        plan = {"effects": [{"type": "absent", "path": "/lab/scratch/run_0312_abl"},
+                            {"type": "exists", "path": "/lab/scratch/2026-03/run_0312_abl"},
+                            {"type": "absent", "path": "/lab/scratch/notes.txt"},
+                            {"type": "exists", "path": "/lab/scratch/notes_march.txt"}]}
+        self.assertEqual(planner.irreversible(plan),
+                         ["/lab/scratch/run_0312_abl -> /lab/scratch/2026-03/"])
+
+
 class Guard(unittest.TestCase):
     """The unintended changes observed in the Milestone 2 runs, replayed against the guard."""
 
