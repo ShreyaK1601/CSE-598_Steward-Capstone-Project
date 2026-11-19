@@ -133,6 +133,14 @@ class StewardHandler(ReliableHandler):
                 stats["skipped"] += 1
                 continue
             name, args, owner = specs.parse_call(call, instances)
+            if self.cfg.verify and name == "send_message":
+                reason = self._hold_reason(instances)
+                if reason:
+                    stats["held_messages"] = stats.get("held_messages", 0) + 1
+                    self.emit("blocked", call=call, reason=reason)
+                    results.append(json.dumps({"error": f"Message held, not sent: {reason}"}))
+                    halted = self.cfg.halt_batch
+                    continue
             if self.cfg.preflight and name:
                 stats["probes"] += 1
                 reason = specs.preflight(name, args, owner, instances, turn_text, created, prev_text)
@@ -169,6 +177,20 @@ class StewardHandler(ReliableHandler):
                 created.update(made)
             results.append(result)
         return results, executed
+
+    def _hold_reason(self, instances):
+        """A notification goes out only once the work it reports on has verified."""
+        if self._previous_failed:
+            return ("the previous request did not complete, so a notification could report "
+                    "something that is not true. Tell the user what failed instead.")
+        plan = self._turn_plan
+        if plan:
+            pending = [e for e in plan["effects"] if e.get("type") != "message_sent"]
+            unmet, _ = verifier.verify(pending, probes.snapshot(instances))
+            if unmet:
+                return (f"this request's other changes are not done yet: {json.dumps(unmet)}. "
+                        "Finish them first, or tell the user what failed.")
+        return None
 
     def _rollback(self, journal, ctx, start_cwd):
         """Undo this turn's journal in reverse. Returns (executed calls, entries with no inverse)."""
@@ -217,6 +239,7 @@ class StewardHandler(ReliableHandler):
         reports, history, aliases, created, requests = [], [], {}, set(), []
         carry_note = ""
         force_quit = False
+        self._turn_plan, self._previous_failed = None, False
 
         inference_data = self._pre_query_processing_prompting(test_entry)
 
@@ -261,6 +284,7 @@ class StewardHandler(ReliableHandler):
                 self.emit("plan", plan=plan)
 
             history.append(request)
+            self._turn_plan = plan
 
             if plan and cfg.approve and not plan["clarify"] and not cfg.approve(plan):
                 reports.append({"turn": turn_idx, "verdict": "not_approved", "changes": [],
@@ -379,6 +403,7 @@ class StewardHandler(ReliableHandler):
             if report["verdict"] in ("rolled_back", "partial"):
                 carry_note = f"Note: the previous turn did not complete. {report['text']}"
             reports.append(report)
+            self._previous_failed = report["verdict"] in ("partial", "rolled_back")
             turn_log["report"] = report
             self.emit("report", report=report)
             if force_quit:

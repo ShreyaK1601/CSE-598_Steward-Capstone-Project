@@ -254,6 +254,18 @@ class CompleteVerification(unittest.TestCase):
         effects = [{"type": "message_sent", "text": "b"}]
         self.assertEqual(len(verifier.unexpected(effects, before, after)), 1)
 
+    def test_message_is_held_after_a_failed_turn(self):
+        case = self.lab_case(0)
+        missing = self.plan([{"type": "exists", "path": "/lab/scratch/2026-03/run_0312_abl"}])
+        notify = self.plan([{"type": "message_sent", "text": "March runs are now in scratch/2026-03."}])
+        send = "[send_message(receiver_id='USR003', message='March runs are now in scratch/2026-03.')]"
+        h = Scripted("t_hold", agent.Config(**dict(agent.STEWARD, rollback=False)),
+                     ["", "", send, ""], [missing, notify])
+        _, meta = h.inference_multi_turn_prompting(case, False, True)
+        self.assertEqual(meta["steward"]["stats"].get("held_messages"), 1)
+        self.assertEqual(meta["steward"]["reports"][0]["verdict"], "partial")
+        self.assertFalse(any("MessageAPI.inbox" in c for c in meta["steward"]["reports"][1]["changes"]))
+
 
 class Guard(unittest.TestCase):
     """The unintended changes observed in the Milestone 2 runs, replayed against the guard."""
