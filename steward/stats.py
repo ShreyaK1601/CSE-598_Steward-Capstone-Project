@@ -36,6 +36,38 @@ def _load(scored):
     return data
 
 
+HARD = {"partial", "rolled_back", "asked", "not_approved"}
+
+
+def _claims(scored, dataset, stem):
+    path = scored.parent / "judged" / dataset / f"{stem}.csv"
+    if not path.exists():
+        return None
+    with open(path) as f:
+        return {r["id"]: r["claim"] for r in csv.DictReader(f)}
+
+
+def disclosure(rows, claims, steward_reports):
+    """(silent wrong success, undisclosed failure) counts for one system's rows.
+
+    Silent wrong success: the case failed while the judge reads the closing text as claiming
+    success. Undisclosed failure: the case failed with no explicit failure report or question.
+    For Steward that means no turn ended not complete, undone, asked or not approved, so a vague
+    "please review" does not count as disclosure. Baselines have no verdicts, so the judge decides.
+    """
+    silent = undisclosed = 0
+    for r in rows:
+        if r["passed"] == "1":
+            continue
+        claim = (claims or {}).get(r["id"])
+        silent += claim == "claims_complete"
+        if steward_reports:
+            undisclosed += not (set(r["verdicts"].split("|")) & HARD)
+        else:
+            undisclosed += claim != "discloses_problem"
+    return silent, undisclosed
+
+
 def _sum(rows, key):
     return sum(float(r[key]) for r in rows)
 
@@ -46,8 +78,8 @@ def write_summary(scored, target):
         lines += [f"## {dataset}", "",
                   "| System | Runs | Pass (per repeat) | Pooled % (Wilson 95%) | Tool calls/case | Tool error rate | "
                   "Blocked | Recovery | State mismatch | Residue | Unintended | Guessed/asked-for turns | "
-                  "Tokens/case | Wall s/case |",
-                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+                  "Silent wrong success | Undisclosed failure | Tokens/case | Wall s/case |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for system, repeats in sorted(systems.items()):
             rows = [r for rep in repeats.values() for r in rep]
             n = len(rows)
@@ -60,11 +92,20 @@ def write_summary(scored, target):
             per = ", ".join(f"{int(_sum(rep, 'passed'))}/{len(rep)}" for _, rep in sorted(repeats.items()))
             tokens = (_sum(rows, "input_tokens") + _sum(rows, "output_tokens")) / n
             mismatch = sum(r["error_type"].endswith("instance_state_mismatch") for r in rows)
+            silent = undisclosed = 0
+            judged = True
+            for repeat, rep in repeats.items():
+                claims = _claims(scored, dataset, f"{system}_r{repeat}")
+                judged &= claims is not None
+                s, u = disclosure(rep, claims, system.startswith("steward"))
+                silent, undisclosed = silent + s, undisclosed + u
+            silent_text = f"{100 * silent / n:.1f}%" if judged else "not judged"
             lines.append(
                 f"| {system} | {len(repeats)} | {per} | {100 * k / n:.1f} ({100 * low:.1f}-{100 * high:.1f}) "
                 f"| {calls / n:.1f} | {100 * errors / max(calls, 1):.1f}% | {int(_sum(rows, 'blocked'))} "
                 f"| {recovered}/{len(with_error)} | {mismatch} | {int(_sum(rows, 'residue'))} "
                 f"| {int(_sum(rows, 'unintended'))} | {int(_sum(rows, 'guessed_turns'))}/{int(_sum(rows, 'empty_gt_turns'))} "
+                f"| {silent_text} | {100 * undisclosed / n:.1f}% "
                 f"| {tokens:.0f} | {_sum(rows, 'wall_seconds') / n:.0f} |")
         lines.append("")
         if "steward" in systems:
