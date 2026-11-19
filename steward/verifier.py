@@ -67,6 +67,50 @@ def grounded(effects, known_text, fs_before):
     return kept
 
 
+def _covers(effect_path, changed):
+    """True if a changed path is the effect's item, inside it, or a folder on the way to it."""
+    parts = [p for p in str(effect_path).strip("/").removeprefix("./").split("/") if p]
+    if not parts:
+        return False
+    tail = "/" + "/".join(parts)
+    if changed.endswith(tail) or (tail + "/") in changed:
+        return True
+    return any(changed.endswith("/" + "/".join(parts[:k])) for k in range(1, len(parts)))
+
+
+def unexpected(effects, before, after):
+    """Changes the plan did not ask for, read from state. Empty when the plan cannot say.
+
+    Only file paths and sent messages are compared. A plan with no file effects cannot judge
+    file changes, and a plan with no message effects cannot judge messages, so those are skipped.
+    """
+    out = []
+    fs_paths = [e.get("path", "") for e in effects if e.get("type") in ("exists", "absent", "content_contains")]
+    fs_before = before.get("GorillaFileSystem")
+    fs_after = after.get("GorillaFileSystem")
+    if fs_paths and fs_before is not None and fs_after is not None:
+        changed = sorted((fs_after.keys() ^ fs_before.keys())
+                         | {p for p in fs_after.keys() & fs_before.keys() if fs_after[p] != fs_before[p]})
+        # A move empties its source, so an item expected at a new place covers its old place.
+        moved = {str(e.get("path", "")).rstrip("/").rsplit("/", 1)[-1]
+                 for e in effects if e.get("type") == "exists"}
+        for path in changed:
+            gone = path in fs_before and path not in fs_after
+            parts = path.strip("/").split("/")
+            if gone and any(p in moved for p in parts):
+                continue
+            if not any(_covers(e, path) for e in fs_paths):
+                out.append(path)
+    expected_messages = sum(e.get("type") == "message_sent" for e in effects)
+    msg_before = before.get("MessageAPI", {}).get("inbox")
+    msg_after = after.get("MessageAPI", {}).get("inbox")
+    if expected_messages and msg_before is not None and msg_after is not None:
+        extra = len(msg_after) - len(msg_before) - expected_messages
+        if extra > 0:
+            out.append(f"{extra} message(s) sent that the request did not ask for")
+    return out
+
+
 def verify(effects, snap):
     """Split effects into (unmet, checked count). Uncheckable effects are not counted."""
     unmet, checked = [], 0

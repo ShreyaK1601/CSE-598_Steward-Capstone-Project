@@ -242,6 +242,18 @@ class CompleteVerification(unittest.TestCase):
         self.assertEqual(report["verdict"], "partial")
         self.assertIn("run_0327_abl", report["text"])
 
+    def test_unrequested_change_is_reported(self):
+        before = {"GorillaFileSystem": {"/lab/a.txt": "x", "/lab/b.txt": "y", "/lab/arc": None}}
+        after = {"GorillaFileSystem": {"/lab/arc": None, "/lab/arc/a.txt": "x", "/lab/arc/b.txt": "y"}}
+        effects = [{"type": "exists", "path": "/lab/arc/a.txt"}]
+        self.assertEqual(verifier.unexpected(effects, before, after), ["/lab/arc/b.txt", "/lab/b.txt"])
+
+    def test_extra_message_is_reported(self):
+        before = {"MessageAPI": {"inbox": []}}
+        after = {"MessageAPI": {"inbox": [{"USR001": "a"}, {"USR002": "b"}]}}
+        effects = [{"type": "message_sent", "text": "b"}]
+        self.assertEqual(len(verifier.unexpected(effects, before, after)), 1)
+
 
 class Guard(unittest.TestCase):
     """The unintended changes observed in the Milestone 2 runs, replayed against the guard."""

@@ -402,11 +402,13 @@ class StewardHandler(ReliableHandler):
             return {"turn": turn_idx, "verdict": "unverified",
                     "changes": probes.diff(before, after), "text": ""}
         unmet, checked = verifier.verify(plan["effects"], after)
+        extra = verifier.unexpected(plan["effects"], before, after)
         stuck = []
         verdict = "verified" if checked and not unmet else "unverified"
-        if unmet:
+        if unmet or extra:
             verdict = "partial"
-            if journal and (cfg.rollback or (cfg.confirm_undo and cfg.confirm_undo(unmet, journal))):
+            problems = unmet + [{"type": "unexpected_change", "path": p} for p in extra]
+            if journal and (cfg.rollback or (cfg.confirm_undo and cfg.confirm_undo(problems, journal))):
                 undone, stuck = self._rollback(journal, ctx, start_cwd)
                 if undone:
                     stats["rollbacks"] += 1
@@ -418,15 +420,19 @@ class StewardHandler(ReliableHandler):
         parts = {
             "verified": f"Done and verified ({checked} expected effects checked).",
             "unverified": "Finished, but no expected effect could be checked; please review.",
-            "partial": f"NOT complete. Unmet: {json.dumps(unmet)}.",
-            "rolled_back": f"NOT complete. Unmet: {json.dumps(unmet)}. This turn's changes were undone.",
+            "partial": "NOT complete.",
+            "rolled_back": "NOT complete. This turn's changes were undone.",
         }
         text = parts[verdict]
+        if unmet:
+            text += f" Unmet: {json.dumps(unmet)}."
+        if extra:
+            text += f" Changes the request did not ask for: {'; '.join(extra)}."
         if stuck:
             text += f" Could not undo: {stuck}."
         text += " Changes: " + ("; ".join(changes) if changes else "none") + "."
         return {"turn": turn_idx, "verdict": verdict, "changes": changes, "text": text,
-                "unmet": unmet, "stuck": stuck}
+                "unmet": unmet, "unexpected": extra, "stuck": stuck}
 
 
 class OpenLoopHandler(ReliableHandler):
