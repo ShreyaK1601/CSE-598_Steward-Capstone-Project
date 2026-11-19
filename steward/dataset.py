@@ -169,4 +169,9 @@ def d2():
     return populate_test_cases_with_predefined_functions(entries), truth
 
 
-DATASETS = {"d1": d1, "d1h": d1h, "d2": d2, "d3": d3}
+def d4():
+    from steward.labset import d4 as build  # labset builds on LAB_CONFIG above
+    return build()
+
+
+DATASETS = {"d1": d1, "d1h": d1h, "d2": d2, "d3": d3, "d4": d4}

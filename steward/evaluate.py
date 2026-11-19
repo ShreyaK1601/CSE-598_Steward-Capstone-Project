@@ -21,7 +21,7 @@ from bfcl_eval.eval_checker.eval_runner import _evaluate_single_multi_turn_entry
 from bfcl_eval.eval_checker.multi_turn_eval import multi_turn_utils
 from bfcl_eval.eval_checker.multi_turn_eval.multi_turn_utils import execute_multi_turn_func_call
 
-from steward import agent, probes, specs, stats, triage
+from steward import agent, labset, probes, specs, stats, triage
 from steward.dataset import DATASETS
 
 RUNS = bfcl_env.ROOT / "runs"
@@ -108,6 +108,22 @@ def _replay(entry, responses, run_name, decoder):
     return calls, errors, mutating_by_turn, probes.snapshot(instances)
 
 
+def _closing_texts(responses, decoder):
+    """The model's own last words in each turn, which is where a read-only answer appears."""
+    texts = {}
+    for turn, steps in enumerate(responses):
+        for step in reversed(steps):
+            try:
+                decoded = decoder.decode_execute(step, has_tool_call_tag=False)
+                is_call = bool(decoded) and not multi_turn_utils.is_empty_execute_response(decoded)
+            except Exception:
+                is_call = False
+            if not is_call and str(step).strip():
+                texts[turn] = str(step)
+                break
+    return texts
+
+
 def _truth_state(entry, truth, run_name):
     config, classes = entry["initial_config"], entry["involved_classes"]
     _, instances = execute_multi_turn_func_call([], config, classes, run_name, entry["id"])
@@ -129,8 +145,13 @@ def score_case(row, entry, truth, tag, decoder):
     _, start_instances = execute_multi_turn_func_call(
         [], entry["initial_config"], entry["involved_classes"], f"{tag}_start", entry["id"])
     start = probes.snapshot(start_instances)
-    verdict = _evaluate_single_multi_turn_entry(
-        decoder, entry["id"], row["result"], truth, deepcopy(entry), f"{tag}_eval", "multi_turn")
+    if "lab_checks" in entry:
+        passed, reasons = labset.score(entry, start, final, target, mutating,
+                                       _closing_texts(row["result"], decoder))
+        verdict = {"valid": passed, "error": {"error_type": "lab:" + "; ".join(reasons)}}
+    else:
+        verdict = _evaluate_single_multi_turn_entry(
+            decoder, entry["id"], row["result"], truth, deepcopy(entry), f"{tag}_eval", "multi_turn")
 
     # Files only: pre-existing data that the correct run keeps and this run lost or changed,
     # and items this run left behind that the correct run does not have.
@@ -141,7 +162,7 @@ def score_case(row, entry, truth, tag, decoder):
                   if fs_truth.get(p, "\0") == v and fs_final.get(p, "\0") != v]
     residue = [p for p in fs_final if p not in fs_truth and p not in fs_start]
 
-    empty_turns = [i for i, t in enumerate(truth) if not t]
+    empty_turns = entry.get("ask_turns", [i for i, t in enumerate(truth) if not t])
     guessed = sum(1 for i in empty_turns if i < len(mutating) and mutating[i] > 0)
 
     extra = row.get("steward", {})

@@ -338,6 +338,61 @@ class Reporting(unittest.TestCase):
         self.assertEqual(stats.disclosure(rows, {"a": "claims_complete", "b": "no_report"}, False), (1, 2))
 
 
+class LabSetV2(unittest.TestCase):
+    EXTRA = {  # what a correct run adds beyond the expected file and ticket calls, per case and turn
+        0: {1: ["send_message(receiver_id='USR003', message='The March runs are now in scratch/2026-03.')"]},
+        2: {0: ["send_message(receiver_id='USR004', message='Your March compute ticket is closed.')",
+                "send_message(receiver_id='USR002', message='Your March compute ticket is closed.')"]},
+        4: {0: ["create_ticket(title='GPU quota increase', description='Need 4 more nodes for the March sweep', priority=2)"],
+            1: ["send_message(receiver_id='USR002', message='The GPU quota ticket is open.')"]},
+        13: {0: ["send_message(receiver_id='USR002', message='The April run is archived.')"]},
+    }
+    ANSWERS = {6: {0: "run_0211_base and run_0218_abl"}, 8: {0: "run_0211_base"}, 10: {0: "11, 12 and 13"}}
+
+    def score(self, case, responses):
+        from steward import evaluate
+        row = {"id": case["id"], "result": responses, "input_token_count": [[0]], "output_token_count": [[0]],
+               "latency": [[0]]}
+        from steward.dataset import d4
+        truth = d4()[1][case["id"]]
+        return evaluate.score_case(row, case, truth, f"t_{case['id']}", evaluate._Decoder("t_dec"))
+
+    def correct_run(self, index, case, truth):
+        responses = []
+        for turn, calls in enumerate(truth):
+            calls = calls + self.EXTRA.get(index, {}).get(turn, [])
+            steps = ["[" + ", ".join(calls) + "]"] if calls else []
+            steps.append(self.ANSWERS.get(index, {}).get(turn, "Done."))
+            responses.append(steps)
+        return responses
+
+    def test_correct_runs_pass_every_case(self):
+        from steward.dataset import d4
+        entries, truth = d4()
+        for index, case in enumerate(entries):
+            scored = self.score(case, self.correct_run(index, case, truth[case["id"]]))
+            self.assertEqual(scored["passed"], 1, f"{case['name']}: {scored['error_type']}")
+
+    def test_guessing_on_a_vague_request_fails(self):
+        from steward.dataset import d4
+        entries, truth = d4()
+        case = next(e for e in entries if e["name"] == "n3_archive_by_description")
+        guess = [["[cd(folder='scratch'), mv(source='ablation_ckpts',destination='archive'), "
+                  "mv(source='run_0218_abl',destination='archive'), mv(source='run_0312_abl',destination='archive'), "
+                  "mv(source='run_0327_abl',destination='archive')]", "Done."], ["Done."]]
+        scored = self.score(case, guess)
+        self.assertEqual(scored["passed"], 0)
+        self.assertIn("should ask", scored["error_type"])
+
+    def test_wrong_recipient_fails(self):
+        from steward.dataset import d4
+        entries, truth = d4()
+        case = entries[2]
+        run = [["[close_ticket(ticket_id=11), close_ticket(ticket_id=13), "
+                "send_message(receiver_id='USR002', message='March tickets closed.')]", "Done."]]
+        self.assertEqual(self.score(case, run)["passed"], 0)
+
+
 class Guard(unittest.TestCase):
     """The unintended changes observed in the Milestone 2 runs, replayed against the guard."""
 
