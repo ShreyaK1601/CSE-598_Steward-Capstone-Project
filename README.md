@@ -130,10 +130,16 @@ completed, and at least 9 of 10 plans approved without the stakeholder asking wh
 - [x] Instrument silent wrong success (LLM judge, `steward/judge.py`)
 - [x] Implement baselines B1 and B2
 - [x] Implement the preflight guard and the end-of-turn verifier
-- [ ] Complete the two-person hand check of the judge's labels
-- [ ] Fix the verifier checking only the planner's own item list (a missed March run was reported as verified)
-- [ ] Ask instead of guessing on ambiguous requests (`multi_turn_labops_3` moved extra runs)
-- [ ] Receive the mirrored directory listing and ten example requests from the stakeholder
+- [x] Complete the two-person hand check of the judge's labels
+- [x] Verify every item a group description matches, not only the planner's own list
+- [x] Ask instead of guessing on ambiguous requests (`multi_turn_labops_3` moved extra runs)
+- [x] Refuse deletes and overwrites the user did not ask for; confirm bulk deletes
+- [x] Warn before moves that cannot be undone; hold notifications until the work verifies
+- [x] Revised lab set (D4) after the stakeholder's review
+- [ ] Stakeholder review of D4 and choice of the ten acceptance requests
+- [ ] Final evaluation (`scripts/final_eval.sh`), report, slides and demo
+
+The full plan, with the root cause behind each remaining target, is in `docs/final-plan.md`.
 
 ## Steward: setup and run
 
@@ -164,6 +170,9 @@ $PY -m steward.judge
 | `d1h` | 30 | Held-out sample of the other `multi_turn_base` cases, seed 598 |
 | `d2` | 10 | Lab operations sandbox, requests written by the team as a stand-in for the stakeholder's |
 | `d3` | 38 | BFCL `multi_turn_miss_param`, ops trio only |
+| `d4` | 15 | Revised lab set after the stakeholder's review (`steward/labset.py`, `docs/lab-set-v2-review.md`) |
+| `d5` | 38 | BFCL `multi_turn_miss_func`, ops trio only (held out, added for the final evaluation) |
+| `march` | 1 | The March request alone, run 20 times to check that all three runs move every time |
 
 | System | Description |
 |---|---|
@@ -176,6 +185,11 @@ person to ask, so it uses the two policies above. `runs/code_freeze.txt` holds t
 the reported runs used (`shasum -a 256 -c runs/code_freeze.txt`); `steward/agent.py` and
 `steward/cli.py` changed afterwards to add the undo prompt, which the evaluator never enables.
 Raw traces (`runs/raw/`) are not committed; scored tables and judge labels are.
+
+Final evaluation: `scripts/final_eval.sh` runs the offline tests, the guard replay
+(`scripts/guard_replay.py`, which must block no ground-truth call), moves the Milestone 2 Steward
+outputs to `runs/milestone2/`, records the code freeze, runs every set, then scores, judges and
+writes `runs/summary.md`. `STEP=<name>` runs a single step.
 
 ---
 
@@ -293,6 +307,9 @@ this baseline should hold the model fixed so that gains are attributable to the 
 | `steward/` | Steward agent, baselines, datasets, evaluation, judge and command line |
 | `tests/test_mechanisms.py` | Offline tests with a scripted model |
 | `scripts/handcheck.py` | Builds blind hand-check forms and compares two raters' labels |
+| `scripts/guard_replay.py` | Runs ground-truth calls through the guard; any block is a false positive |
+| `scripts/final_eval.sh` | The final evaluation, step by step |
+| `docs/final-plan.md` | Plan for the final submission |
 | `runs/` | Scored results, judge labels, summary and code freeze record |
 | `docs/development-notes.md` | Development findings and the undo-on-approval decision |
 
