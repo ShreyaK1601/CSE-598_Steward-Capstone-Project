@@ -196,6 +196,53 @@ class Ambiguity(unittest.TestCase):
         self.assertNotIn("mv(", json.dumps(responses[0]))
 
 
+class CompleteVerification(unittest.TestCase):
+    MARCH = {"phrase": "the March runs", "folder": "/lab/scratch", "pattern": "run_03*",
+             "action": "move", "destination": "/lab/scratch/2026-03"}
+
+    def lab_case(self, index):
+        from steward.dataset import d2
+        return next(e for e in d2()[0] if e["id"] == f"multi_turn_labops_{index}")
+
+    def plan(self, effects, groups=()):
+        return {"clarify": None, "summary": [], "aliases": {}, "readings": {},
+                "groups": list(groups), "effects": effects}
+
+    def test_group_pattern_expands_to_every_matching_item(self):
+        from steward.dataset import LAB_CONFIG
+        from steward import probes
+        from bfcl_eval.eval_checker.multi_turn_eval.multi_turn_utils import execute_multi_turn_func_call
+        _, inst = execute_multi_turn_func_call([], LAB_CONFIG, ["GorillaFileSystem"], "t_expand", "lab_0")
+        fs = probes.snapshot(inst)["GorillaFileSystem"]
+        # The planner's own list names only two of the three March runs.
+        plan = self.plan([{"type": "exists", "path": "/lab/scratch/2026-03/run_0312_abl"},
+                          {"type": "exists", "path": "/lab/scratch/2026-03/run_0319_base"}], [self.MARCH])
+        planner.expand_groups(plan, fs)
+        self.assertEqual(plan["items"]["the March runs"], ["run_0312_abl", "run_0319_base", "run_0327_abl"])
+        self.assertIn({"type": "exists", "path": "/lab/scratch/2026-03/run_0327_abl"}, plan["effects"])
+        self.assertIn({"type": "absent", "path": "/lab/scratch/run_0327_abl"}, plan["effects"])
+
+    def test_match_all_pattern_is_ignored(self):
+        plan = self.plan([], [dict(self.MARCH, pattern="*")])
+        planner.expand_groups(plan, {"/lab/scratch/run_0312_abl": None})
+        self.assertEqual(plan["effects"], [])
+
+    def test_missed_march_run_is_reported_not_verified(self):
+        # The November 1 failure: two of three runs moved, reported "Done and verified".
+        moves = ("[cd(folder='scratch'), mkdir(dir_name='2026-03'), "
+                 "mv(source='run_0312_abl', destination='2026-03'), "
+                 "mv(source='run_0319_base', destination='2026-03')]")
+        plan = self.plan([{"type": "exists", "path": "/lab/scratch/2026-03"}], [self.MARCH])
+        case = self.lab_case(0)
+        case["question"] = case["question"][:1]
+        h = Scripted("t_march", agent.Config(**dict(agent.STEWARD, rollback=False)),
+                     [moves, "", ""], [plan])
+        _, meta = h.inference_multi_turn_prompting(case, False, True)
+        report = meta["steward"]["reports"][0]
+        self.assertEqual(report["verdict"], "partial")
+        self.assertIn("run_0327_abl", report["text"])
+
+
 class Guard(unittest.TestCase):
     """The unintended changes observed in the Milestone 2 runs, replayed against the guard."""
 

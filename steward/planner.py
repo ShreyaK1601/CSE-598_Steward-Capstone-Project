@@ -1,5 +1,6 @@
 """Interpreter and planner: one LLM call per turn, outside the executor's history."""
 
+import fnmatch
 import json
 import re
 
@@ -24,8 +25,15 @@ Return one JSON object and nothing else:
  "summary": ["at most three short lines saying what will happen"],
  "aliases": {{"phrase the user used": "concrete path or id it refers to"}},
  "readings": {{"group phrase the user used": [["items for one reading"], ["items for another"]]}},
+ "groups": [{{"phrase": "group phrase", "folder": "/absolute/folder/holding/them",
+             "pattern": "shell-style name pattern", "action": "move, copy or delete",
+             "destination": "/absolute/destination/folder or null"}}],
  "effects": [ expected end-of-turn effects ]
 }}
+
+When the request refers to items by a description rather than by name ("the March runs"), add a
+"groups" entry: the folder that holds them and a name pattern (such as run_03*) that matches every
+intended item in that folder and nothing else. Steward checks every item the pattern matches.
 
 Set "clarify" to a short question, and change nothing, in any of these cases:
 1. A value that a tool strictly requires appears nowhere in the request, the conversation, earlier
@@ -55,7 +63,7 @@ Never use placeholders or values that must be computed first; leave such effects
 Do not list a source file as absent after a copy. Do not invent effects the user did not ask for.
 """
 
-FALLBACK = {"clarify": None, "summary": [], "aliases": {}, "readings": {}, "effects": []}
+FALLBACK = {"clarify": None, "summary": [], "aliases": {}, "readings": {}, "groups": [], "effects": []}
 
 
 def parse_plan(text):
@@ -73,6 +81,8 @@ def parse_plan(text):
         "summary": [str(s) for s in (data.get("summary") or [])][:3],
         "aliases": data.get("aliases") if isinstance(data.get("aliases"), dict) else {},
         "readings": _readings(data.get("readings")),
+        "groups": [g for g in data.get("groups") or [] if isinstance(g, dict)]
+        if isinstance(data.get("groups"), list) else [],
         "effects": [e for e in effects if isinstance(e, dict)] if isinstance(effects, list) else [],
     }
 
@@ -136,3 +146,38 @@ def plan_prompt(history, aliases, state, tools, request):
         history="\n".join(f"- {h}" for h in history) or "(none)",
         aliases=json.dumps(aliases), state=state, tools=", ".join(tools), request=request,
     )
+
+
+ACTIONS = {"move", "copy", "delete"}
+
+
+def expand_groups(plan, fs):
+    """Turn each group's folder and pattern into the full item list and one effect per item.
+
+    The item list comes from the probed state, not from the planner's memory of it, so an item the
+    planner left out of its own list is still expected and checked. Adds plan["items"].
+    """
+    effects, items = list(plan.get("effects", [])), {}
+    for group in plan.get("groups", []):
+        folder = "/" + str(group.get("folder", "")).strip("/")
+        pattern = str(group.get("pattern", "")).strip()
+        action = str(group.get("action", "")).lower()
+        if not pattern or pattern in ("*", "*.*") or action not in ACTIONS:
+            continue
+        names = sorted(p.rsplit("/", 1)[-1] for p in fs
+                       if p.rsplit("/", 1)[0] == folder and fnmatch.fnmatchcase(p.rsplit("/", 1)[-1], pattern))
+        if not names:
+            continue
+        dest = "/" + str(group.get("destination") or "").strip("/")
+        if action in ("move", "copy") and dest == "/":
+            continue
+        items[str(group.get("phrase") or pattern)] = names
+        for name in names:
+            new = []
+            if action in ("move", "delete"):
+                new.append({"type": "absent", "path": f"{folder}/{name}"})
+            if action in ("move", "copy"):
+                new.append({"type": "exists", "path": f"{dest}/{name}"})
+            effects += [e for e in new if e not in effects]
+    plan["effects"], plan["items"] = effects, items
+    return plan

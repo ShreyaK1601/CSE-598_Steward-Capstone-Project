@@ -28,6 +28,10 @@ def printer(kind, data):
             print("  expected effects:")
             for effect in plan["effects"]:
                 print(f"    {json.dumps(effect)}")
+        for phrase, names in plan.get("items", {}).items():
+            print(f"  {phrase}: {len(names)} items")
+            for name in names:
+                print(f"    - {name}")
         if plan["aliases"]:
             print(f"  resolved: {json.dumps(plan['aliases'])}")
     elif kind == "tool":
