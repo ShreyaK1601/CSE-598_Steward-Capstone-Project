@@ -382,6 +382,17 @@ class Guard(unittest.TestCase):
         text = case["question"][0][-1]["content"]
         self.assertIsNone(self.check(inst, "rm(file_name='DylanProject.txt')", text))
 
+    def test_bulk_delete_of_a_named_folder_asks_first(self):
+        from steward.dataset import d2
+        case = next(e for e in d2()[0] if e["id"] == "multi_turn_labops_4")
+        from bfcl_eval.eval_checker.multi_turn_eval.multi_turn_utils import execute_multi_turn_func_call
+        _, inst = execute_multi_turn_func_call(["cd(folder='scratch')"], case["initial_config"],
+                                               case["involved_classes"], "g_bulk", case["id"])
+        reason = self.check(inst, "rm(file_name='config.yaml')", "Delete everything in scratch.")
+        self.assertIn("confirm", reason)
+        self.assertIsNone(self.check(inst, "rm(file_name='notes.txt')",
+                                     "Yes, go ahead and delete everything in scratch."))
+
     def test_new_file_request_does_not_overwrite_an_existing_one(self):
         # base_10: asked for a new notes.md; Steward overwrote the existing one.
         case, inst = self.state("d1", "multi_turn_base_10", ["cd(folder='workspace')"])

@@ -157,6 +157,26 @@ def deletion_requested(target, folders, turn_text, prev_text):
     return any(named(item, text) for item in [target, *folders])
 
 
+CONFIRM_WORDS = re.compile(r"\b(yes|yeah|confirm\w*|go ahead|proceed)\b", re.I)
+BULK_LIMIT = 2
+
+
+def bulk_reason(target, fs, text, turn_text, created):
+    """Deleting a folder's contents in bulk ("delete everything in scratch") needs a confirmation.
+
+    Applies only when the item itself was not named, so the permission comes from naming its
+    folder, and the folder holds more than BULK_LIMIT existing items.
+    """
+    if fs is None or named(target, text) or CONFIRM_WORDS.search(turn_text):
+        return None
+    existing = [n for n in _names(fs) if n not in created and not n.startswith(".")]
+    if len(existing) <= BULK_LIMIT:
+        return None
+    return (f"refused: this would delete {len(existing)} existing items in "
+            f"{fs.pwd()['current_working_directory']} that the user did not name one by one: "
+            f"{existing}. List them and ask the user to confirm before deleting anything.")
+
+
 def overwrite_reason(args, instances, turn_text, prev_text, created):
     """Refuse to replace the content of a user's existing file unless the user asked for it."""
     fs = instances.get("GorillaFileSystem")
@@ -190,8 +210,11 @@ def preflight(name, args, owner, instances, turn_text, created, prev_text=""):
             if not deletion_requested(target, folders, turn_text, prev_text):
                 return (f"refused: {name} of '{target}', which Steward did not create and the user "
                         f"did not name for deletion. Ask the user which item to delete.")
-            places = [p for p in probes.walk_fs(fs) if p.rsplit("/", 1)[-1] == target] if fs else []
             text = turn_text + " " + prev_text
+            reason = bulk_reason(target, fs, text, turn_text, created)
+            if reason:
+                return reason
+            places = [p for p in probes.walk_fs(fs) if p.rsplit("/", 1)[-1] == target] if fs else []
             if len(places) > 1 and not any(named(f, text) for f in folders):
                 return (f"refused: '{target}' exists in {len(places)} places ({', '.join(places)}) "
                         f"and the user did not say which folder. Ask the user which one to delete.")
