@@ -7,7 +7,7 @@ from steward import bfcl_env  # noqa: F401
 from bfcl_eval.eval_checker.eval_runner import _evaluate_single_multi_turn_entry
 from bfcl_eval.utils import load_dataset_entry, load_ground_truth_entry
 
-from steward import agent, specs, verifier
+from steward import agent, planner, specs, verifier
 
 
 class Scripted(agent.StewardHandler):
@@ -149,6 +149,51 @@ class Mechanisms(unittest.TestCase):
         ], "copy to IdeasArchive.txt and write keep this exact text inside", {"/a/run_1": None})
         self.assertEqual([e.get("text", e.get("path", e["type"])) for e in kept],
                          ["/a/IdeasArchive.txt", "/a/run_1", "keep this exact text", "ticket_status"])
+
+
+class Ambiguity(unittest.TestCase):
+    OLD = ", ".join(f"/lab/scratch/{r}" for r in (
+        "run_0211_base", "run_0218_abl", "run_0312_abl", "run_0319_base", "run_0327_abl", "run_0402_base"))
+
+    def plan(self, aliases, readings=None):
+        effects = [{"type": "exists", "path": "/lab/scratch/archive/run_0211_base"}]
+        return {"clarify": None, "summary": [], "aliases": aliases, "readings": readings or {},
+                "effects": effects}
+
+    def test_vague_group_resolved_to_several_items_asks(self):
+        question = planner.ambiguity(self.plan({"old runs": self.OLD}), "Move the old runs into the archive.")
+        self.assertIn("run_0211_base", question)
+        self.assertIn("Nothing has been changed", question)
+
+    def test_dated_group_does_not_ask(self):
+        aliases = {"March runs": "/lab/scratch/run_0312_abl, /lab/scratch/run_0319_base"}
+        self.assertIsNone(planner.ambiguity(
+            self.plan(aliases), "Consolidate the March runs into a new folder called 2026-03."))
+
+    def test_planner_readings_that_disagree_ask(self):
+        readings = {"old runs": [["run_0211_base", "run_0218_abl"], ["run_0211_base"]]}
+        question = planner.ambiguity(self.plan({}, readings), "Archive the old runs")
+        self.assertIn("run_0218_abl", question)
+
+    def test_single_reading_does_not_ask(self):
+        readings = {"ablation checkpoints folder": [["/lab/scratch/ablation_ckpts"]]}
+        self.assertIsNone(planner.ambiguity(self.plan({}, readings), "Archive the ablation checkpoints folder"))
+
+    def test_parse_plan_reads_readings(self):
+        plan = planner.parse_plan(json.dumps({"readings": {"x": [["b", "a"], ["a", "b"], "c"]}}))
+        self.assertEqual(plan["readings"], {"x": [["a", "b"], ["c"]]})
+
+    def test_old_runs_request_asks_and_changes_nothing(self):
+        from steward.dataset import d2
+        case = next(e for e in d2()[0] if e["id"] == "multi_turn_labops_3")
+        move_all = "[cd(folder='scratch'), mv(source='run_0211_base', destination='archive')]"
+        h = Scripted("t_amb", agent.Config(**agent.STEWARD), [move_all, ""],
+                     [self.plan({"old runs": self.OLD})])
+        responses, meta = h.inference_multi_turn_prompting(case, False, True)
+        report = meta["steward"]["reports"][0]
+        self.assertEqual(report["verdict"], "asked")
+        self.assertEqual(report["changes"], [])
+        self.assertNotIn("mv(", json.dumps(responses[0]))
 
 
 class Guard(unittest.TestCase):

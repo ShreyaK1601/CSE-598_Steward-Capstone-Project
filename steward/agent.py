@@ -250,6 +250,11 @@ class StewardHandler(ReliableHandler):
                     plan["effects"], " ".join(history + [request]),
                     probes.snapshot(ctx["instances"]).get("GorillaFileSystem", {}))
                 plan["effects_dropped"] = proposed - len(plan["effects"])
+                if cfg.clarify and not plan["clarify"]:
+                    question = planner.ambiguity(plan, request)
+                    if question:
+                        plan["clarify"] = question
+                        stats["ambiguity_questions"] = stats.get("ambiguity_questions", 0) + 1
                 aliases.update(plan["aliases"])
                 turn_log["plan"] = plan
                 self.emit("plan", plan=plan)
