@@ -451,9 +451,13 @@ class StewardHandler(ReliableHandler):
                     self.emit("rollback", calls=undone, stuck=stuck)
             after = probes.snapshot(ctx["instances"])
         changes = probes.diff(before, after)
+        if verdict == "unverified":
+            # Nothing could be checked: say plainly whether anything changed at all.
+            verdict = "no_change" if not changes else "unchecked"
         parts = {
             "verified": f"Done and verified ({checked} expected effects checked).",
-            "unverified": "Finished, but no expected effect could be checked; please review.",
+            "no_change": "No changes were made.",
+            "unchecked": "Finished, but Steward could not check these changes automatically.",
             "partial": "NOT complete.",
             "rolled_back": "NOT complete. This turn's changes were undone.",
         }
@@ -464,7 +468,8 @@ class StewardHandler(ReliableHandler):
             text += f" Changes the request did not ask for: {'; '.join(extra)}."
         if stuck:
             text += f" Could not undo: {stuck}."
-        text += " Changes: " + ("; ".join(changes) if changes else "none") + "."
+        if verdict != "no_change":
+            text += " Changes: " + ("; ".join(changes) if changes else "none") + "."
         return {"turn": turn_idx, "verdict": verdict, "changes": changes, "text": text,
                 "unmet": unmet, "unexpected": extra, "stuck": stuck}
 

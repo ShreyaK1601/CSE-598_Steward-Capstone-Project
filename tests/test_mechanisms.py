@@ -314,6 +314,18 @@ class IrreversibleWarning(unittest.TestCase):
 
 
 class Reporting(unittest.TestCase):
+    def test_read_only_turn_reports_no_change_not_review(self):
+        from steward.dataset import d2
+        case = next(e for e in d2()[0] if e["id"] == "multi_turn_labops_9")
+        case["question"] = case["question"][:1]
+        plan = {"clarify": None, "summary": [], "aliases": {}, "readings": {}, "groups": [], "effects": []}
+        h = Scripted("t_ro", agent.Config(**dict(agent.STEWARD, rollback=False)),
+                     ["[cd(folder='scratch'), wc(file_name='notes.txt', mode='l')]", "3 lines."], [plan])
+        _, meta = h.inference_multi_turn_prompting(case, False, True)
+        report = meta["steward"]["reports"][0]
+        self.assertEqual(report["verdict"], "no_change")
+        self.assertNotIn("review", report["text"])
+
     def test_disclosure_counts(self):
         from steward import stats
         rows = [{"id": "a", "passed": "0", "verdicts": "verified|unchecked"},
