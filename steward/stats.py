@@ -108,14 +108,16 @@ def write_summary(scored, target):
                 f"| {silent_text} | {100 * undisclosed / n:.1f}% "
                 f"| {tokens:.0f} | {_sum(rows, 'wall_seconds') / n:.0f} |")
         lines.append("")
-        if "steward" in systems:
-            for other in sorted(set(systems) - {"steward"}):
-                for repeat in sorted(set(systems["steward"]) & set(systems[other])):
-                    mine = {r["id"]: int(r["passed"]) for r in systems["steward"][repeat]}
+        # The agreed policy (stop and report) is the main system; automatic undo is a comparison.
+        main = next((s for s in ("steward_norollback", "steward") if s in systems), None)
+        if main:
+            for other in sorted(set(systems) - {main}):
+                for repeat in sorted(set(systems[main]) & set(systems[other])):
+                    mine = {r["id"]: int(r["passed"]) for r in systems[main][repeat]}
                     theirs = {r["id"]: int(r["passed"]) for r in systems[other][repeat]}
                     ids = sorted(mine.keys() & theirs.keys())
                     a, b, p = mcnemar([mine[i] for i in ids], [theirs[i] for i in ids])
-                    lines.append(f"- steward vs {other}, repeat {repeat}: only steward {a}, only {other} {b}, "
+                    lines.append(f"- {main} vs {other}, repeat {repeat}: only {main} {a}, only {other} {b}, "
                                  f"exact McNemar p = {p:.3f} (n = {len(ids)})")
             lines.append("")
     target.write_text("\n".join(lines) + "\n")

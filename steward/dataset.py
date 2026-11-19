@@ -174,4 +174,19 @@ def d4():
     return build()
 
 
-DATASETS = {"d1": d1, "d1h": d1h, "d2": d2, "d3": d3, "d4": d4}
+def d5():
+    """Held-out category: a tool needed later in the conversation is missing at first."""
+    return _load("multi_turn_miss_func", _ops)
+
+
+def march():
+    """The March request alone (D4 case 1, first turn), run 20 times to check it is always complete."""
+    entries, truth = d4()
+    entry = deepcopy(entries[0])
+    entry["question"] = entry["question"][:1]
+    entry["lab_checks"] = entry["lab_checks"][:1]
+    entry["id"] = "multi_turn_march_0"
+    return [entry], {entry["id"]: truth[entries[0]["id"]][:1]}
+
+
+DATASETS = {"d1": d1, "d1h": d1h, "d2": d2, "d3": d3, "d4": d4, "d5": d5, "march": march}
