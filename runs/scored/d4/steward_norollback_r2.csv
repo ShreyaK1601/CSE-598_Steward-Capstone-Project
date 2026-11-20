@@ -1,0 +1,16 @@
+id,passed,error_type,tool_calls,tool_errors,blocked,skipped,probes,repairs,rollbacks,input_tokens,output_tokens,llm_seconds,wall_seconds,unintended,residue,empty_gt_turns,guessed_turns,verdicts
+multi_turn_labv2_0,1,,7,0,0,0,13,0,0,30581,770,59.14,89.0,0,0,0,0,verified|unchecked
+multi_turn_labv2_1,0,"lab:turn 2 should ask and change nothing, but made 1 changes",3,0,0,0,12,0,0,33279,650,88.57,138.7,0,0,1,1,verified|verified|verified
+multi_turn_labv2_2,1,,9,1,0,0,12,0,0,19858,395,56.6,85.61,0,0,0,0,verified
+multi_turn_labv2_3,0,"lab:turn 1 should ask and change nothing, but made 2 changes",3,0,0,0,9,0,0,16057,278,27.66,42.18,0,0,1,1,verified|no_change
+multi_turn_labv2_4,0,"lab:0 messages sent, expected 1; no message to USR002 mentioning [['ticket', 'quota']]",2,0,0,0,9,1,0,31813,637,89.89,102.33,0,0,0,0,partial|no_change
+multi_turn_labv2_5,1,,29,0,3,40,39,1,0,74151,1730,206.36,266.32,0,0,1,0,partial|verified
+multi_turn_labv2_6,1,,5,0,0,0,11,0,0,21502,594,91.69,115.64,0,0,0,0,no_change|verified
+multi_turn_labv2_7,0,"lab:file tree differs from the expected one; turn 1 should ask and change nothing, but made 4 changes",6,0,0,0,12,0,0,22747,958,90.33,167.26,3,3,1,1,verified|no_change
+multi_turn_labv2_8,1,,6,0,2,1,15,1,0,37599,608,108.02,137.33,0,0,1,0,no_change|partial
+multi_turn_labv2_9,1,,2,0,2,20,11,1,0,39200,1115,99.57,124.39,0,0,1,0,partial|verified
+multi_turn_labv2_10,0,"lab:turn 1 answer does not name [['11'], ['12'], ['13']]",2,0,0,0,8,0,0,11910,283,40.1,51.57,0,0,0,0,no_change|verified
+multi_turn_labv2_11,1,,2,0,0,0,5,0,0,10004,154,11.16,17.23,0,0,0,0,verified
+multi_turn_labv2_12,0,"lab:turn 1 should ask and change nothing, but made 1 changes",2,0,2,0,11,1,0,49301,616,141.74,160.44,0,0,1,1,verified|verified
+multi_turn_labv2_13,0,"lab:file tree differs from the expected one; 0 messages sent, expected 1; no message to USR002 mentioning [['april', '0402']]",3,0,5,13,12,1,0,52524,662,144.41,157.01,0,0,0,0,partial
+multi_turn_labv2_14,1,,0,0,0,0,4,0,0,6470,325,7.19,23.52,0,0,1,0,asked|no_change

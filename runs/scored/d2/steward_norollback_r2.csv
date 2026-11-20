@@ -1,0 +1,11 @@
+id,passed,error_type,tool_calls,tool_errors,blocked,skipped,probes,repairs,rollbacks,input_tokens,output_tokens,llm_seconds,wall_seconds,unintended,residue,empty_gt_turns,guessed_turns,verdicts
+multi_turn_labops_0,1,,7,0,0,0,13,0,0,30343,815,83.75,115.36,0,0,0,0,verified|verified
+multi_turn_labops_1,1,,3,0,0,0,9,0,0,21102,432,54.85,72.38,0,0,0,0,verified|verified
+multi_turn_labops_2,1,,6,0,0,0,12,0,0,25911,600,85.48,111.99,0,0,0,0,verified|verified
+multi_turn_labops_3,1,,3,0,0,0,7,0,0,11232,633,16.05,43.96,0,0,1,0,asked|verified
+multi_turn_labops_4,1,,4,0,2,5,9,0,0,20416,364,33.13,47.39,0,0,0,0,verified
+multi_turn_labops_5,1,,3,0,1,0,7,0,0,14833,196,21.14,29.99,0,0,0,0,verified
+multi_turn_labops_6,1,,4,0,1,0,12,1,0,40958,484,77.81,99.73,0,0,0,0,verified|partial
+multi_turn_labops_7,1,,2,0,0,0,6,0,0,11190,349,18.98,36.78,0,0,1,0,asked|verified
+multi_turn_labops_8,1,,2,0,0,0,8,0,0,20426,359,61.8,75.4,0,0,0,0,verified|verified
+multi_turn_labops_9,1,,4,0,0,0,10,0,0,20960,325,59.89,73.42,0,0,0,0,no_change|verified
