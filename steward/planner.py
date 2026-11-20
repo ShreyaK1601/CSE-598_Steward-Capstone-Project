@@ -126,28 +126,37 @@ def _short(item):
     return str(item).rstrip("/").rsplit("/", 1)[-1]
 
 
-def ambiguity(plan, request):
-    """Return a question when a group phrase has several readings, else None. Deterministic.
+def _files_only(sets, fs_names):
+    """True when every item in every reading is an existing file or folder."""
+    return bool(fs_names) and all(_short(i) in fs_names for s in sets for i in s)
+
+
+def ambiguity(plan, request, fs_names=()):
+    """Return a question when a group of files has several readings, else None. Deterministic.
 
     Two checks: the planner's own readings disagree, or a vague phrase ("the old runs") was
     resolved to several items although the request gives no date, number, name or "all".
+    Both apply only to groups of existing files and folders; for other tools (a car's settings,
+    a stock order) the planner's readings are not items to choose between, so it decides itself.
     """
+    fs_names = set(fs_names)
     for phrase, sets in plan.get("readings", {}).items():
-        if len(sets) > 1:
+        if len(sets) > 1 and _files_only(sets, fs_names):
             options = "; or ".join(", ".join(_short(i) for i in s) for s in sets[:4])
             return f'When you say "{phrase}", which do you mean: {options}? Nothing has been changed yet.'
     if not plan.get("effects"):
         return None
     vague_request = VAGUE.search(request) and not SPECIFIC.search(request)
     for phrase, sets in plan.get("readings", {}).items():
-        if vague_request and len(sets) == 1 and len(sets[0]) > 1 and VAGUE.search(str(phrase)):
+        if vague_request and len(sets) == 1 and len(sets[0]) > 1 and VAGUE.search(str(phrase)) \
+                and _files_only(sets, fs_names):
             names = ", ".join(_short(i) for i in sets[0][:8])
             return (f'"{phrase}" could cover several items: {names}. Which of these should I include? '
                     "Nothing has been changed yet.")
     for phrase, target in plan.get("aliases", {}).items():
         items = [t for t in re.split(r"[,;]\s*", str(target)) if t.strip()]
         if len(items) > 1 and VAGUE.search(str(phrase)) and VAGUE.search(request) \
-                and not SPECIFIC.search(request):
+                and not SPECIFIC.search(request) and _files_only([items], fs_names):
             names = ", ".join(_short(i) for i in items[:8])
             return (f'"{phrase}" could mean several different sets of items. I found {names}. '
                     f"Which of these should I include? Nothing has been changed yet.")

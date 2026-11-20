@@ -152,8 +152,9 @@ class Mechanisms(unittest.TestCase):
 
 
 class Ambiguity(unittest.TestCase):
-    OLD = ", ".join(f"/lab/scratch/{r}" for r in (
-        "run_0211_base", "run_0218_abl", "run_0312_abl", "run_0319_base", "run_0327_abl", "run_0402_base"))
+    RUNS = ("run_0211_base", "run_0218_abl", "run_0312_abl", "run_0319_base", "run_0327_abl", "run_0402_base")
+    OLD = ", ".join(f"/lab/scratch/{r}" for r in RUNS)
+    FILES = set(RUNS) | {"ablation_ckpts", "scratch", "archive", "notes.txt"}
 
     def plan(self, aliases, readings=None):
         effects = [{"type": "exists", "path": "/lab/scratch/archive/run_0211_base"}]
@@ -161,23 +162,29 @@ class Ambiguity(unittest.TestCase):
                 "effects": effects}
 
     def test_vague_group_resolved_to_several_items_asks(self):
-        question = planner.ambiguity(self.plan({"old runs": self.OLD}), "Move the old runs into the archive.")
+        question = planner.ambiguity(self.plan({"old runs": self.OLD}), "Move the old runs into the archive.",
+                                     self.FILES)
         self.assertIn("run_0211_base", question)
         self.assertIn("Nothing has been changed", question)
 
     def test_dated_group_does_not_ask(self):
         aliases = {"March runs": "/lab/scratch/run_0312_abl, /lab/scratch/run_0319_base"}
         self.assertIsNone(planner.ambiguity(
-            self.plan(aliases), "Consolidate the March runs into a new folder called 2026-03."))
+            self.plan(aliases), "Consolidate the March runs into a new folder called 2026-03.", self.FILES))
 
     def test_planner_readings_that_disagree_ask(self):
         readings = {"old runs": [["run_0211_base", "run_0218_abl"], ["run_0211_base"]]}
-        question = planner.ambiguity(self.plan({}, readings), "Archive the old runs")
+        question = planner.ambiguity(self.plan({}, readings), "Archive the old runs", self.FILES)
         self.assertIn("run_0218_abl", question)
+
+    def test_readings_that_are_not_files_do_not_ask(self):
+        readings = {"Set cruise control to 65 mph": [["active", "cruiseStatus"], ["60.0", "currentSpeed"]]}
+        self.assertIsNone(planner.ambiguity(self.plan({}, readings), "Set cruise control to 65 mph.", self.FILES))
 
     def test_single_reading_does_not_ask(self):
         readings = {"ablation checkpoints folder": [["/lab/scratch/ablation_ckpts"]]}
-        self.assertIsNone(planner.ambiguity(self.plan({}, readings), "Archive the ablation checkpoints folder"))
+        self.assertIsNone(planner.ambiguity(self.plan({}, readings), "Archive the ablation checkpoints folder",
+                                            self.FILES))
 
     def test_parse_plan_reads_readings(self):
         plan = planner.parse_plan(json.dumps({"readings": {"x": [["b", "a"], ["a", "b"], "c"]}}))
@@ -544,8 +551,9 @@ class AskRules(unittest.TestCase):
     def test_vague_group_with_one_reading_asks(self):
         plan = {"effects": [{"type": "absent", "path": "x"}], "aliases": {},
                 "readings": {"ablation stuff": [["/s/ablation_ckpts", "/s/run_0218_abl"]]}}
-        self.assertIn("ablation_ckpts", planner.ambiguity(plan, "Archive the ablation stuff in scratch."))
-        self.assertIsNone(planner.ambiguity(plan, "Archive the March runs in scratch."))
+        names = {"ablation_ckpts", "run_0218_abl"}
+        self.assertIn("ablation_ckpts", planner.ambiguity(plan, "Archive the ablation stuff in scratch.", names))
+        self.assertIsNone(planner.ambiguity(plan, "Archive the March runs in scratch.", names))
 
     def test_planner_sees_required_parameters(self):
         f = {"name": "echo", "description": "x. Tool description: Write content to a file. More.",

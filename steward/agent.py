@@ -306,7 +306,7 @@ class StewardHandler(ReliableHandler):
                     last = reports[-1] if reports else None
                     question = (planner.near_miss(request, names, " ".join(history))
                                 or planner.reversal(request, last["changes"] if last else [])
-                                or planner.ambiguity(plan, request))
+                                or planner.ambiguity(plan, request, names))
                     if question:
                         plan["clarify"] = question
                         stats["ambiguity_questions"] = stats.get("ambiguity_questions", 0) + 1
