@@ -128,6 +128,14 @@ CASES = [
     ]),
 ]
 
+# The acceptance test (8 of 10 completed, 9 of 10 plans acceptable). Shreya approved all fifteen
+# and left the choice to us: the five revised originals plus one new request for each scenario on
+# her list (purge clean-up, find by date, general description, another person's change, refusal).
+ACCEPTANCE = ["r1_march_natural", "r2_confirm_nothing_else", "r3_notify_requesters", "r6_confirm_typo",
+              "r9_ticket_natural", "n1_purge_vague", "n2_find_by_month", "n3_archive_by_description",
+              "n4_review_other_change", "n5_refuse_bulk_delete"]
+ACCEPTANCE_IDS = {f"multi_turn_labv2_{i}" for i, case in enumerate(CASES) if case[0] in ACCEPTANCE}
+
 
 def d4():
     entries, truth = [], {}

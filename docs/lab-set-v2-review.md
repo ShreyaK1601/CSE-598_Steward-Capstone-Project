@@ -65,3 +65,11 @@ If this matters, we will say so in the report as a limitation.
 1. Which 10 requests should form the acceptance test?
 2. Is any expected outcome wrong? In particular, N4 (report rather than move back) and N5 (ask before a bulk delete).
 3. Is anything you see often still missing?
+
+## Outcome (November 19)
+
+Shreya approved all fifteen requests as written and asked the team to choose the acceptance set for
+task coverage. The ten chosen are R1, R2, R3, R6, R9 (her five revisions) and N1 to N5 (one request for
+each scenario on her list: purge clean-up, find by date, general description, another person's
+change, and a request that must be confirmed). The choice is recorded in `steward/labset.py`
+(`ACCEPTANCE`) and the summary reports it per repeat.
