@@ -67,7 +67,7 @@ fi
 
 if step march; then
   echo "==> the March request, 20 repeats"
-  run --datasets march --systems $MAIN --repeats "$(seq -s, 0 19)"
+  run --datasets march --systems $MAIN --repeats "$(seq 0 19 | paste -sd, -)"
 fi
 
 if step baselines; then
