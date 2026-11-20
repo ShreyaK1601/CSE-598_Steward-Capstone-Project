@@ -15,3 +15,7 @@ if env_file.exists():
             key, value = line.split("=", 1)
             if value.strip():
                 os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+
+# The Voyager key, when present, takes precedence over the older QWEN_API_KEY entry.
+if os.environ.get("VOYAGER_API_KEY"):
+    os.environ["QWEN_API_KEY"] = os.environ["VOYAGER_API_KEY"]
