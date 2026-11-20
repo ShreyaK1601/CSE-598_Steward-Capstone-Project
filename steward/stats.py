@@ -108,6 +108,24 @@ def write_summary(scored, target):
                 f"| {silent_text} | {100 * undisclosed / n:.1f}% "
                 f"| {tokens:.0f} | {_sum(rows, 'wall_seconds') / n:.0f} |")
         lines.append("")
+        if "b0" in systems:
+            base = [r for rep in systems["b0"].values() for r in rep]
+            base_tokens = (_sum(base, "input_tokens") + _sum(base, "output_tokens")) / len(base)
+            for system, repeats in sorted(systems.items()):
+                rows = [r for rep in repeats.values() for r in rep]
+                tokens = (_sum(rows, "input_tokens") + _sum(rows, "output_tokens")) / len(rows)
+                lines.append(f"- Cost of {system}: {tokens / base_tokens:.2f}x the tokens of b0 per case")
+            lines.append("")
+        if dataset == "d4":
+            from steward.labset import ACCEPTANCE_IDS
+            lines.append(f"Acceptance test ({len(ACCEPTANCE_IDS)} requests; target 8 completed):")
+            lines.append("")
+            for system, repeats in sorted(systems.items()):
+                per = ", ".join(f"{sum(r['passed'] == '1' for r in rep if r['id'] in ACCEPTANCE_IDS)}/"
+                                f"{sum(r['id'] in ACCEPTANCE_IDS for r in rep)}"
+                                for _, rep in sorted(repeats.items()))
+                lines.append(f"- {system}: {per} per repeat")
+            lines.append("")
         # The agreed policy (stop and report) is the main system; automatic undo is a comparison.
         main = next((s for s in ("steward_norollback", "steward") if s in systems), None)
         if main:
