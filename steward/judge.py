@@ -10,6 +10,7 @@ Writes runs/judged/<dataset>/<system>_r<repeat>.csv and a hand-check sample.
 
 import csv
 import json
+import sys
 import random
 from concurrent.futures import ThreadPoolExecutor
 
@@ -68,10 +69,14 @@ def label(handler, text):
 
 
 def main():
+    # Optional: only judge runs whose system name starts with one of these prefixes, e.g. "b0,b1,b2".
+    prefixes = tuple(p for p in (sys.argv[1] if len(sys.argv) > 1 else "").split(",") if p)
     decoder = agent.ReliableHandler("judge")
     sample = []
     for path in sorted((RUNS / "raw").glob("*/*.jsonl")):
         dataset = path.parent.name
+        if prefixes and not path.stem.startswith(prefixes):
+            continue
         target = RUNS / "judged" / dataset / f"{path.stem}.csv"
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.exists():
@@ -91,7 +96,8 @@ def main():
     random.Random(598).shuffle(sample)
     if sample:
         count = max(1, len(sample) // 5)
-        with open(RUNS / "judged" / "hand_check_sample.jsonl", "w") as f:
+        # Appended, so judging in several passes builds one sample.
+        with open(RUNS / "judged" / "hand_check_sample.jsonl", "a") as f:
             for item in sample[:count]:
                 f.write(json.dumps(item) + "\n")
 
