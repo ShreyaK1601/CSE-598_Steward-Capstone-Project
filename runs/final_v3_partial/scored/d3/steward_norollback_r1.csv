@@ -1,0 +1,13 @@
+id,passed,error_type,tool_calls,tool_errors,blocked,skipped,probes,repairs,rollbacks,input_tokens,output_tokens,llm_seconds,wall_seconds,unintended,residue,empty_gt_turns,guessed_turns,verdicts
+multi_turn_miss_param_1,1,,15,4,0,0,32,0,0,93639,1217,324.98,374.12,0,0,1,0,no_change|verified|no_change|no_change|no_change
+multi_turn_miss_param_2,0,multi_turn:empty_turn_model_response,6,0,3,0,27,1,0,118621,1873,272.16,335.69,0,0,1,1,unchecked|asked|partial|no_change|partial|no_change
+multi_turn_miss_param_3,0,multi_turn:empty_turn_model_response,11,0,6,8,28,1,0,77590,1267,344.55,398.18,0,4,1,1,no_change|partial|no_change
+multi_turn_miss_param_6,1,,9,0,1,2,26,0,0,67435,1298,190.69,245.46,0,0,1,0,verified|verified|no_change|asked|no_change|verified
+multi_turn_miss_param_10,1,,10,0,2,1,29,1,0,85731,1386,283.82,329.27,0,0,1,0,verified|partial|verified|verified|asked|no_change
+multi_turn_miss_param_12,0,multi_turn:empty_turn_model_response,4,0,0,0,16,0,0,37908,610,105.7,142.93,0,0,1,0,verified|unchecked|no_change|no_change
+multi_turn_miss_param_14,1,,8,0,0,0,23,0,0,79933,1091,185.09,225.16,0,0,1,0,no_change|verified|no_change|no_change|verified
+multi_turn_miss_param_15,1,,7,0,0,0,23,0,0,90964,1306,205.48,261.77,0,0,1,0,verified|asked|verified|no_change|verified|no_change
+multi_turn_miss_param_17,0,multi_turn:empty_turn_model_response,7,0,0,0,17,0,0,52904,653,143.78,174.94,0,0,1,1,no_change|asked|verified|no_change
+multi_turn_miss_param_19,0,multi_turn:instance_state_mismatch,9,0,4,0,23,1,0,82247,990,191.67,228.54,0,1,1,0,no_change|partial|asked|asked
+multi_turn_miss_param_23,0,multi_turn:empty_turn_model_response,4,0,0,0,16,0,0,54172,645,112.92,184.48,0,0,1,1,verified|no_change|verified|no_change
+multi_turn_miss_param_24,1,,7,0,1,0,23,2,0,97373,1115,169.5,209.84,0,0,1,0,asked|no_change|partial|no_change|partial
