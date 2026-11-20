@@ -409,6 +409,30 @@ class Guard(unittest.TestCase):
         name, args, owner = specs.parse_call(call, instances)
         return specs.preflight(name, args, owner, instances, text, set(created), prev)
 
+    def test_deleting_a_full_folder_asks_first(self):
+        # Final run v1, labv2_9 repeat 0: rm('scratch') from /lab deleted 19 items in one call.
+        case, inst = self.state("d4", "multi_turn_labv2_9")
+        text = case["question"][0][-1]["content"]
+        self.assertIn("inside it", self.check(inst, "rm(file_name='scratch')", text))
+        self.assertIsNone(self.check(inst, "rm(file_name='scratch')", "Yes, delete scratch and everything in it."))
+
+    def test_placeholder_text_is_not_written(self):
+        # Final run v1, miss_param_25: echo wrote "{{sorted_content}}" over summary.txt.
+        case, inst = self.state("d3", "multi_turn_miss_param_25")
+        text = case["question"][2][-1]["content"] + " The file is 'summary.txt'."
+        for content in ("{{sorted_content}}", "sort(file_name='summary.txt')['sorted_content']"):
+            call = f"echo(content={content!r},file_name='summary.txt')"
+            self.assertIn("placeholder", self.check(inst, call, text))
+
+    def test_unrequested_rename_is_refused(self):
+        # Final run v1, miss_func_45: mv('ResearchDocs', 'temp') renamed the user's folder.
+        case, inst = self.state("d5", "multi_turn_miss_func_45")
+        text = case["question"][1][-1]["content"]
+        self.assertIn("rename", self.check(inst, "mv(source='ResearchDocs',destination='temp')", text))
+        _, inst = self.state("d4", "multi_turn_labv2_11", ["cd(folder='scratch')"])
+        self.assertIsNone(self.check(inst, "mv(source='notes.txt',destination='notes_march.txt')",
+                                     "Rename the notes file, call it notes_march.txt."))
+
     def test_move_up_a_level_is_refused(self):
         # labv2_8 smoke run: mv(destination='..') created a folder literally named "..".
         case, inst = self.state("d4", "multi_turn_labv2_8", ["cd(folder='scratch')", "cd(folder='archive')"])
