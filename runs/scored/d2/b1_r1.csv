@@ -1,0 +1,11 @@
+id,passed,error_type,tool_calls,tool_errors,blocked,skipped,probes,repairs,rollbacks,input_tokens,output_tokens,llm_seconds,wall_seconds,unintended,residue,empty_gt_turns,guessed_turns,verdicts
+multi_turn_labops_0,1,,7,0,0,0,0,0,0,13145,122,48.66,48.67,0,0,0,0,
+multi_turn_labops_1,1,,4,1,0,0,0,0,0,9213,39,24.09,24.1,0,0,0,0,
+multi_turn_labops_2,1,,5,0,0,0,0,0,0,8911,51,15.97,15.98,0,0,0,0,
+multi_turn_labops_3,0,multi_turn:instance_state_mismatch,12,5,0,0,0,0,0,9282,148,41.0,41.0,8,8,1,1,
+multi_turn_labops_4,1,,3,0,0,0,0,0,0,4596,28,28.78,28.79,0,0,0,0,
+multi_turn_labops_5,0,multi_turn:instance_state_mismatch,2,1,0,0,0,0,0,4589,21,9.86,9.87,0,0,0,0,
+multi_turn_labops_6,1,,4,0,0,0,0,0,0,9217,37,11.62,11.63,0,0,0,0,
+multi_turn_labops_7,0,multi_turn:instance_state_mismatch,4,3,0,0,0,0,0,9224,44,15.8,15.8,0,0,1,0,
+multi_turn_labops_8,1,,3,0,0,0,0,0,0,8941,54,29.1,29.1,0,0,0,0,
+multi_turn_labops_9,0,multi_turn:instance_state_mismatch,5,2,0,0,0,0,0,9218,50,21.37,21.37,0,0,0,0,

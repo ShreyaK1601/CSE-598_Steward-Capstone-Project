@@ -1,0 +1,11 @@
+id,passed,error_type,tool_calls,tool_errors,blocked,skipped,probes,repairs,rollbacks,input_tokens,output_tokens,llm_seconds,wall_seconds,unintended,residue,empty_gt_turns,guessed_turns,verdicts
+multi_turn_labops_0,0,multi_turn:instance_state_mismatch,9,4,0,0,0,0,0,37721,232,131.46,131.47,0,0,0,0,unverified|unverified
+multi_turn_labops_1,0,multi_turn:empty_turn_model_response,5,1,0,0,0,0,0,30091,48,29.32,29.33,0,0,0,0,unverified|unverified
+multi_turn_labops_2,0,multi_turn:instance_state_mismatch,3,0,0,0,0,0,0,21233,66,48.66,48.67,0,0,0,0,unverified|unverified
+multi_turn_labops_3,0,multi_turn:instance_state_mismatch,11,5,0,0,0,0,0,26798,151,80.75,80.76,0,1,1,1,unverified|unverified
+multi_turn_labops_4,0,multi_turn:instance_state_mismatch,9,3,0,0,0,0,0,35118,94,58.08,58.09,0,1,0,0,unverified
+multi_turn_labops_5,0,multi_turn:instance_state_mismatch,9,4,0,0,0,0,0,26454,128,41.98,41.99,0,2,0,0,unverified
+multi_turn_labops_6,0,multi_turn:instance_state_mismatch,32,18,0,0,0,0,0,69966,277,206.9,206.92,0,1,0,0,unverified|unverified
+multi_turn_labops_7,1,,8,4,0,0,0,0,0,27022,86,72.69,72.7,0,0,1,0,unverified|unverified
+multi_turn_labops_8,1,,4,1,0,0,0,0,0,21927,177,38.22,38.23,0,0,0,0,unverified|unverified
+multi_turn_labops_9,1,,5,1,0,0,0,0,0,21433,102,45.99,46.0,0,0,0,0,unverified|unverified
