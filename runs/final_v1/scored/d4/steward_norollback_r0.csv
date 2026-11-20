@@ -1,0 +1,16 @@
+id,passed,error_type,tool_calls,tool_errors,blocked,skipped,probes,repairs,rollbacks,input_tokens,output_tokens,llm_seconds,wall_seconds,unintended,residue,empty_gt_turns,guessed_turns,verdicts
+multi_turn_labv2_0,1,,7,0,0,0,13,0,0,30663,844,143.65,252.18,0,0,0,0,verified|unchecked
+multi_turn_labv2_1,0,"lab:turn 2 should ask and change nothing, but made 1 changes",3,0,0,0,12,0,0,33387,643,95.34,150.05,0,0,1,1,verified|verified|verified
+multi_turn_labv2_2,1,,8,0,0,0,11,0,0,19599,444,61.43,78.17,0,0,0,0,verified
+multi_turn_labv2_3,0,"lab:turn 1 should ask and change nothing, but made 2 changes",3,0,1,0,10,0,0,20982,264,195.94,262.07,0,0,1,1,verified|no_change
+multi_turn_labv2_4,1,,3,0,0,0,10,1,0,31321,507,119.85,148.14,0,0,0,0,verified|unchecked
+multi_turn_labv2_5,1,,5,0,2,3,12,1,0,27544,759,141.95,176.41,0,0,1,0,asked|verified
+multi_turn_labv2_6,1,,7,1,1,1,14,0,0,35941,603,152.45,203.03,0,0,0,0,no_change|verified
+multi_turn_labv2_7,0,"lab:file tree differs from the expected one; turn 1 should ask and change nothing, but made 4 changes",6,0,4,7,17,1,0,50874,1138,219.22,261.37,3,3,1,1,verified|no_change
+multi_turn_labv2_8,1,,6,0,4,0,17,1,0,56074,824,170.9,208.2,0,0,1,0,no_change|partial
+multi_turn_labv2_9,0,"lab:file tree differs from the expected one; turn 1 should ask and change nothing, but made 1 changes",1,0,0,0,5,0,0,10774,522,27.05,55.76,19,0,1,1,verified|asked
+multi_turn_labv2_10,0,"lab:turn 1 answer does not name [['11'], ['12'], ['13']]",2,0,0,0,8,0,0,11926,286,55.98,81.3,0,0,0,0,no_change|verified
+multi_turn_labv2_11,1,,2,0,0,0,5,0,0,10004,154,16.61,22.14,0,0,0,0,verified
+multi_turn_labv2_12,0,"lab:turn 1 should ask and change nothing, but made 1 changes",2,0,1,0,9,0,0,20806,400,57.78,157.57,0,0,1,1,verified|no_change
+multi_turn_labv2_13,1,,4,0,0,0,7,0,0,14102,321,47.94,60.06,0,0,0,0,verified
+multi_turn_labv2_14,1,,0,0,0,0,4,0,0,6467,190,7.88,18.0,0,0,1,0,asked|no_change
