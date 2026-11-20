@@ -189,4 +189,46 @@ def march():
     return [entry], {entry["id"]: truth[entries[0]["id"]][:1]}
 
 
-DATASETS = {"d1": d1, "d1h": d1h, "d2": d2, "d3": d3, "d4": d4, "d5": d5, "march": march}
+# Dev and held-out splits, added for the third final run. Both use scenarios that no earlier set
+# uses (BFCL numbers its scenarios the same way across categories, so a scenario index is excluded
+# everywhere once any set uses it). Dev is for tuning; D6 is run once, after the code freeze.
+SPLIT_SEED = 2026
+DEV_SIZE, D6_SIZE = 15, 45
+CATEGORIES = ("multi_turn_base", "multi_turn_miss_param", "multi_turn_miss_func")
+
+
+def _index(case_id):
+    return int(case_id.rsplit("_", 1)[1])
+
+
+def _fresh_indices():
+    entries, _ = _load("multi_turn_base", lambda e: _used(e) and not (_used(e) & OPS))
+    taken = {_index(e["id"]) for e in d1h()[0]}
+    pool = sorted(_index(e["id"]) for e in entries if _index(e["id"]) not in taken)
+    random.Random(SPLIT_SEED).shuffle(pool)
+    return pool[:DEV_SIZE], pool[DEV_SIZE:DEV_SIZE + D6_SIZE]
+
+
+def _split(indices):
+    """Scenario i goes to category i mod 3 of the rotation, so each category gets a third."""
+    want = {}
+    for n, index in enumerate(indices):
+        want.setdefault(CATEGORIES[n % 3], set()).add(index)
+    entries, truth = [], {}
+    for category, keep in want.items():
+        picked, t = _load(category, lambda e, k=keep: _index(e["id"]) in k)
+        entries += picked
+        truth.update(t)
+    return entries, truth
+
+
+def dev():
+    return _split(_fresh_indices()[0])
+
+
+def d6():
+    return _split(_fresh_indices()[1])
+
+
+DATASETS = {"d1": d1, "d1h": d1h, "d2": d2, "d3": d3, "d4": d4, "d5": d5, "march": march,
+            "dev": dev, "d6": d6}
