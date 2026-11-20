@@ -157,6 +157,10 @@ def deletion_requested(target, folders, turn_text, prev_text):
     return any(named(item, text) for item in [target, *folders])
 
 
+MESSAGE_WORDS = re.compile(
+    r"\b(message\w*|send\w*|sent|tell|told|notify\w*|inform\w*|let [\w ]{1,40}? know|ping|"
+    r"text|dm|contact\w*|reach out|update \w+|alert|reply|replied|respond\w*|forward\w*|"
+    r"share|write to|note to|communicat\w*|ask \w+|remind\w*)\b", re.I)
 CONFIRM_WORDS = re.compile(r"\b(yes|yeah|confirm\w*|go ahead|proceed)\b", re.I)
 BULK_LIMIT = 2
 
@@ -270,6 +274,10 @@ def preflight(name, args, owner, instances, turn_text, created, prev_text=""):
             if len(places) > 1 and not any(named(f, text) for f in folders):
                 return (f"refused: '{target}' exists in {len(places)} places ({', '.join(places)}) "
                         f"and the user did not say which folder. Ask the user which one to delete.")
+    elif name == "send_message":
+        if not MESSAGE_WORDS.search(turn_text + " " + prev_text):
+            return ("refused: the user did not ask for a message to be sent. Do not notify anyone "
+                    "unless asked; mention it to the user instead.")
     elif name == "echo":
         reason = (placeholder_reason(args)
                   or overwrite_reason(args, instances, turn_text, prev_text, created))
