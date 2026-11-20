@@ -409,6 +409,14 @@ class Guard(unittest.TestCase):
         name, args, owner = specs.parse_call(call, instances)
         return specs.preflight(name, args, owner, instances, text, set(created), prev)
 
+    def test_move_up_a_level_is_refused(self):
+        # labv2_8 smoke run: mv(destination='..') created a folder literally named "..".
+        case, inst = self.state("d4", "multi_turn_labv2_8", ["cd(folder='scratch')", "cd(folder='archive')"])
+        reason = self.check(inst, "mv(source='run_0211_base',destination='..')", "Put it back in scratch.")
+        self.assertIn("refused", reason)
+        self.assertIsNone(self.check(inst, "mv(source='run_0211_base',destination='run_old')",
+                                     "Rename run_0211_base to run_old."))
+
     def test_remove_it_does_not_delete_a_file_never_named(self):
         # base_41: "removing it" meant the message; Steward deleted the notes file.
         case, inst = self.state("d1", "multi_turn_base_41", ["cd(folder='initial_directory')"])

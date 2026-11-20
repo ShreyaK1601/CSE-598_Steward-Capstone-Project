@@ -222,6 +222,13 @@ def preflight(name, args, owner, instances, turn_text, created, prev_text=""):
         reason = overwrite_reason(args, instances, turn_text, prev_text, created)
         if reason:
             return reason
+    elif name in ("mv", "cp"):
+        # The file tools take plain names only: ".." or "a/b" become literal, oddly named items.
+        dest = str(args.get("destination", "")).strip()
+        if dest in (".", "..") or "/" in dest:
+            return (f"refused: {name} to '{dest}'. The file tools can only move an item into a folder "
+                    f"inside the current one or rename it in place; they cannot move it up or along "
+                    f"a path. Tell the user this cannot be done with the available tools.")
     try:
         return CHECKS[owner](name, args, instances[owner])
     except (TypeError, ValueError, KeyError):
