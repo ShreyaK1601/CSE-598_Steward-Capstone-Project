@@ -177,6 +177,57 @@ def bulk_reason(target, fs, text, turn_text, created):
             f"{existing}. List them and ask the user to confirm before deleting anything.")
 
 
+def folder_reason(target, fs, turn_text, created):
+    """Deleting a folder deletes everything inside it, so a non-empty folder needs a confirmation."""
+    if fs is None or CONFIRM_WORDS.search(turn_text):
+        return None
+    node = getattr(fs, "_current_dir", None)
+    item = node.contents.get(target) if node is not None else None
+    if item is None or not hasattr(item, "contents"):
+        return None
+    inside = []
+
+    def visit(folder, path):
+        for child_name, child in folder.contents.items():
+            if child_name not in created:
+                inside.append(f"{path}/{child_name}")
+            if hasattr(child, "contents"):
+                visit(child, f"{path}/{child_name}")
+
+    visit(item, target)
+    if not inside:
+        return None
+    shown = ", ".join(inside[:8]) + (", ..." if len(inside) > 8 else "")
+    return (f"refused: deleting folder '{target}' would also delete the {len(inside)} existing items "
+            f"inside it ({shown}). List them and ask the user to confirm before deleting anything.")
+
+
+# Text that stands for a value instead of being one: {{x}}, ${x}, <x>, or an unevaluated call.
+PLACEHOLDER = re.compile(r"\{\{|\}\}|\$\{|<[a-z_ ]{2,30}>|\b(cat|sort|grep|wc|tail|head|diff)\s*\(|\[\s*'[a-z_]+'\s*\]", re.I)
+
+
+def placeholder_reason(args):
+    content = str(args.get("content", ""))
+    if PLACEHOLDER.search(content):
+        return (f"refused: the content {content[:80]!r} is a placeholder, not the actual text. "
+                f"Read the value first, then write the real text.")
+    return None
+
+
+def rename_reason(args, fs, turn_text, prev_text, created):
+    """Renaming an existing item to a name the user never gave is an unrequested change."""
+    source, dest = args.get("source"), str(args.get("destination", "")).strip()
+    if fs is None or not source or not dest or source in created or source not in _names(fs):
+        return None
+    if _is_dir(fs, dest):
+        return None
+    if named(dest, turn_text + " " + prev_text):
+        return None
+    return (f"refused: this would rename the existing item '{source}' to '{dest}', a name the user "
+            f"did not give. Do not rename or move the user's items as a workaround; tell the user "
+            f"what cannot be done with the available tools.")
+
+
 def overwrite_reason(args, instances, turn_text, prev_text, created):
     """Refuse to replace the content of a user's existing file unless the user asked for it."""
     fs = instances.get("GorillaFileSystem")
@@ -211,7 +262,8 @@ def preflight(name, args, owner, instances, turn_text, created, prev_text=""):
                 return (f"refused: {name} of '{target}', which Steward did not create and the user "
                         f"did not name for deletion. Ask the user which item to delete.")
             text = turn_text + " " + prev_text
-            reason = bulk_reason(target, fs, text, turn_text, created)
+            reason = (bulk_reason(target, fs, text, turn_text, created)
+                      or folder_reason(target, fs, turn_text, created))
             if reason:
                 return reason
             places = [p for p in probes.walk_fs(fs) if p.rsplit("/", 1)[-1] == target] if fs else []
@@ -219,7 +271,8 @@ def preflight(name, args, owner, instances, turn_text, created, prev_text=""):
                 return (f"refused: '{target}' exists in {len(places)} places ({', '.join(places)}) "
                         f"and the user did not say which folder. Ask the user which one to delete.")
     elif name == "echo":
-        reason = overwrite_reason(args, instances, turn_text, prev_text, created)
+        reason = (placeholder_reason(args)
+                  or overwrite_reason(args, instances, turn_text, prev_text, created))
         if reason:
             return reason
     elif name in ("mv", "cp"):
@@ -229,6 +282,10 @@ def preflight(name, args, owner, instances, turn_text, created, prev_text=""):
             return (f"refused: {name} to '{dest}'. The file tools can only move an item into a folder "
                     f"inside the current one or rename it in place; they cannot move it up or along "
                     f"a path. Tell the user this cannot be done with the available tools.")
+        if name == "mv":
+            reason = rename_reason(args, instances.get("GorillaFileSystem"), turn_text, prev_text, created)
+            if reason:
+                return reason
     try:
         return CHECKS[owner](name, args, instances[owner])
     except (TypeError, ValueError, KeyError):
