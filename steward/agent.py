@@ -105,7 +105,7 @@ class StewardHandler(ReliableHandler):
         )
 
     def _plan(self, entry, history, aliases, instances, request, stats):
-        tools = [f["name"] for f in entry["function"]]
+        tools = list(entry["function"]) + self._added_tools
         prompt = planner.plan_prompt(history, aliases, probes.brief(instances), tools, request)
         stats["probes"] += 1
 
@@ -121,6 +121,20 @@ class StewardHandler(ReliableHandler):
             stats["planner_input_tokens"] += response.usage.prompt_tokens
             stats["planner_output_tokens"] += response.usage.completion_tokens
         return planner.parse_plan(response.choices[0].message.content)
+
+    def _review(self, history, request, trace, reply, instances, stats):
+        prompt = planner.review_prompt(history, request, trace, reply, probes.brief(instances, 1500))
+        stats["reviews"] = stats.get("reviews", 0) + 1
+
+        def call():
+            return self.client.chat.completions.create(
+                model=self.model_name, temperature=0, messages=[{"role": "user", "content": prompt}])
+
+        response = self._with_retries(call)
+        if response.usage:
+            stats["planner_input_tokens"] += response.usage.prompt_tokens
+            stats["planner_output_tokens"] += response.usage.completion_tokens
+        return planner.parse_review(response.choices[0].message.content)
 
     def _run_batch(self, calls, instances_ctx, turn_text, journal, created, stats, prev_text=""):
         """Run one model step. Returns (results, executed calls)."""
@@ -249,6 +263,7 @@ class StewardHandler(ReliableHandler):
         carry_note = ""
         force_quit = False
         self._turn_plan, self._previous_failed = None, False
+        self._added_tools = []
 
         inference_data = self._pre_query_processing_prompting(test_entry)
 
@@ -257,6 +272,8 @@ class StewardHandler(ReliableHandler):
                 message = [{"role": "user",
                             "content": DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_PROMPTING.format(
                                 functions=holdout[str(turn_idx)])}]
+                # The functions become available from this turn on; the planner must know that.
+                self._added_tools += list(holdout[str(turn_idx)])
             message = deepcopy(message)
             request = " ".join(m["content"] for m in message if m["role"] == "user")
             prev_request = requests[-1] if requests else ""
@@ -284,7 +301,12 @@ class StewardHandler(ReliableHandler):
                 plan["effects_dropped"] = proposed - len(plan["effects"])
                 planner.expand_groups(plan, probes.snapshot(ctx["instances"]).get("GorillaFileSystem", {}))
                 if cfg.clarify and not plan["clarify"]:
-                    question = planner.ambiguity(plan, request)
+                    fs_now = probes.snapshot(ctx["instances"]).get("GorillaFileSystem", {})
+                    names = {p.rstrip("/").rsplit("/", 1)[-1] for p in fs_now}
+                    last = reports[-1] if reports else None
+                    question = (planner.near_miss(request, names, " ".join(history))
+                                or planner.reversal(request, last["changes"] if last else [])
+                                or planner.ambiguity(plan, request))
                     if question:
                         plan["clarify"] = question
                         stats["ambiguity_questions"] = stats.get("ambiguity_questions", 0) + 1
@@ -326,7 +348,7 @@ class StewardHandler(ReliableHandler):
             inference_data["message"].extend(message)
 
             step, repaired, reprompted, retries, turn_calls = 0, False, False, 0, 0
-            last_failed = False
+            last_failed, review, reviewed, trace = False, None, False, []
             while True:
                 step_log = []
                 turn_log[f"step_{step}"] = step_log
@@ -380,6 +402,22 @@ class StewardHandler(ReliableHandler):
                                 "complete, return no function call.")})
                             step += 1
                             continue
+                    if cfg.verify and plan is not None and turn_calls:
+                        review = self._review(history[:-len(trace) or None], request, trace, raw,
+                                              ctx["instances"], stats)
+                        if not review["done"] and not reviewed:
+                            reviewed = True
+                            stats["review_repairs"] = stats.get("review_repairs", 0) + 1
+                            self.emit("verify", unmet=[review["missing"]])
+                            step_log.append({"role": "handler_log", "content": f"review: {review}"})
+                            inference_data["message"].append({"role": "user", "content": (
+                                f"A final check found this part of the request not done: {review['missing']}. "
+                                "Current state:\n" + probes.brief(ctx["instances"]) +
+                                "\nCall the functions needed to finish it. If it is in fact complete, or "
+                                "cannot be done with the available tools, return no function call and "
+                                "say so plainly.")})
+                            step += 1
+                            continue
                     break
 
                 data["model_responses_decoded"] = calls
@@ -393,6 +431,7 @@ class StewardHandler(ReliableHandler):
                     step_log.append({"role": "tool", "content": result})
                 for call, result in zip(executed, results):
                     history.append(f"called {call}, result: {str(result)[:300]}")
+                    trace.append(f"called {call}, result: {str(result)[:300]}")
                 last_failed = any(triage.is_error(r.split(" [")[0]) for r in results)
                 if cfg.naive_retry and last_failed and retries < cfg.naive_retry:
                     retries += 1
@@ -408,11 +447,14 @@ class StewardHandler(ReliableHandler):
 
             after = probes.snapshot(ctx["instances"])
             report = self._finish_turn(plan, journal, ctx, start_cwd, before, after, turn_idx,
-                                       turn_response, stats)
-            if report["verdict"] in ("rolled_back", "partial"):
+                                       turn_response, stats, review)
+            # Only a failure found in state holds back later messages; a review's opinion alone does not.
+            failed = report["verdict"] == "rolled_back" or (
+                report["verdict"] == "partial" and (report.get("unmet") or report.get("unexpected")))
+            if failed:
                 carry_note = f"Note: the previous turn did not complete. {report['text']}"
             reports.append(report)
-            self._previous_failed = report["verdict"] in ("partial", "rolled_back")
+            self._previous_failed = bool(failed)
             turn_log["report"] = report
             self.emit("report", report=report)
             if force_quit:
@@ -429,7 +471,8 @@ class StewardHandler(ReliableHandler):
         }
         return all_response, metadata
 
-    def _finish_turn(self, plan, journal, ctx, start_cwd, before, after, turn_idx, turn_response, stats):
+    def _finish_turn(self, plan, journal, ctx, start_cwd, before, after, turn_idx, turn_response, stats,
+                     review=None):
         """Decide the verdict, roll back if needed, and report what actually changed."""
         cfg = self.cfg
         if not (cfg.verify and plan):
@@ -439,7 +482,8 @@ class StewardHandler(ReliableHandler):
         extra = verifier.unexpected(plan["effects"], before, after)
         stuck = []
         verdict = "verified" if checked and not unmet else "unverified"
-        if unmet or extra:
+        missing = review["missing"] if review and not review["done"] else ""
+        if unmet or extra or missing:
             verdict = "partial"
             problems = unmet + [{"type": "unexpected_change", "path": p} for p in extra]
             if journal and (cfg.rollback or (cfg.confirm_undo and cfg.confirm_undo(problems, journal))):
@@ -457,13 +501,15 @@ class StewardHandler(ReliableHandler):
         parts = {
             "verified": f"Done and verified ({checked} expected effects checked).",
             "no_change": "No changes were made.",
-            "unchecked": "Finished, but Steward could not check these changes automatically.",
+            "unchecked": "NOT verified: Steward could not check these changes. Please check them.",
             "partial": "NOT complete.",
             "rolled_back": "NOT complete. This turn's changes were undone.",
         }
         text = parts[verdict]
         if unmet:
             text += f" Unmet: {json.dumps(unmet)}."
+        if missing:
+            text += f" Not done: {missing}."
         if extra:
             text += f" Changes the request did not ask for: {'; '.join(extra)}."
         if stuck:
@@ -471,7 +517,7 @@ class StewardHandler(ReliableHandler):
         if verdict != "no_change":
             text += " Changes: " + ("; ".join(changes) if changes else "none") + "."
         return {"turn": turn_idx, "verdict": verdict, "changes": changes, "text": text,
-                "unmet": unmet, "unexpected": extra, "stuck": stuck}
+                "unmet": unmet, "unexpected": extra, "stuck": stuck, "missing": missing}
 
 
 class OpenLoopHandler(ReliableHandler):

@@ -498,5 +498,72 @@ class Guard(unittest.TestCase):
                                      "write x into the new file", created={"ideas.txt"}))
 
 
+class AskRules(unittest.TestCase):
+    """Deterministic ask rules: a near-miss name, a narrowing request, a vague group."""
+
+    def test_typo_in_folder_name_asks(self):
+        q = planner.near_miss("Go to the scrach folder and create STATUS.txt", {"scratch", "archive"})
+        self.assertIn('"scratch"', q)
+
+    def test_new_names_and_plurals_do_not_ask(self):
+        names = {"scratch", "file1.txt", "Project_Guide.md", "reports"}
+        for text in ("Write it into a new file call file5.txt.", "name it 'Project_Guide_1.md'",
+                     "Show me the report folder", "Go to scratch"):
+            self.assertIsNone(planner.near_miss(text, names), text)
+
+    def test_never_asks_where_bfcl_expects_action(self):
+        def names(cfg):
+            out = []
+
+            def walk(node):
+                for k, v in (node.get("contents") or {}).items():
+                    out.append(k)
+                    if isinstance(v, dict):
+                        walk(v)
+            for k, v in cfg.get("GorillaFileSystem", {}).get("root", {}).items():
+                out.append(k)
+                walk(v)
+            return out
+        for category in ("multi_turn_base", "multi_turn_miss_param", "multi_turn_miss_func"):
+            truth = {g["id"]: g["ground_truth"] for g in load_ground_truth_entry(category)}
+            for entry in load_dataset_entry(category, include_language_specific_hint=False):
+                seen = ""
+                for turn, message in enumerate(entry["question"]):
+                    text = " ".join(m["content"] for m in message if m["role"] == "user")
+                    asked = (planner.near_miss(text, names(entry["initial_config"]), seen)
+                             or planner.reversal(text, ["changed"] if turn else []))
+                    calls = truth[entry["id"]][turn] if turn < len(truth[entry["id"]]) else []
+                    self.assertFalse(asked and calls, f"{entry['id']} turn {turn}")
+                    seen += " " + text
+
+    def test_narrowing_after_a_change_asks_keep_or_undo(self):
+        text = "Actually, nothing else should move. Just rename notes.txt to notes_march.txt."
+        self.assertIn("keep that change or undo", planner.reversal(text, ["created /a/b"]))
+        self.assertIsNone(planner.reversal(text, []))
+
+    def test_vague_group_with_one_reading_asks(self):
+        plan = {"effects": [{"type": "absent", "path": "x"}], "aliases": {},
+                "readings": {"ablation stuff": [["/s/ablation_ckpts", "/s/run_0218_abl"]]}}
+        self.assertIn("ablation_ckpts", planner.ambiguity(plan, "Archive the ablation stuff in scratch."))
+        self.assertIsNone(planner.ambiguity(plan, "Archive the March runs in scratch."))
+
+    def test_planner_sees_required_parameters(self):
+        f = {"name": "echo", "description": "x. Tool description: Write content to a file. More.",
+             "parameters": {"properties": {"content": {}, "file_name": {}}, "required": ["content"]}}
+        self.assertEqual(planner.signature(f), "echo(content, [file_name]) - Write content to a file")
+
+    def test_unrequested_message_is_refused(self):
+        self.assertIsNone(specs.MESSAGE_WORDS.search(
+            "Can you open a ticket asking for a GPU quota increase? Say we need 4 more nodes for the "
+            "March sweep, priority 2."))
+        self.assertTrue(specs.MESSAGE_WORDS.search("Let priya know it's open."))
+        self.assertTrue(specs.MESSAGE_WORDS.search("Let whoever opened them know."))
+
+    def test_review_reply_parsing(self):
+        self.assertEqual(planner.parse_review('{"done": false, "missing": "close ticket 12"}'),
+                         {"done": False, "missing": "close ticket 12"})
+        self.assertTrue(planner.parse_review("garbled")["done"])
+
+
 if __name__ == "__main__":
     unittest.main()
