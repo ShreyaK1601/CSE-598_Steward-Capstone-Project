@@ -1,0 +1,16 @@
+id,passed,error_type,tool_calls,tool_errors,blocked,skipped,probes,repairs,rollbacks,input_tokens,output_tokens,llm_seconds,wall_seconds,unintended,residue,empty_gt_turns,guessed_turns,verdicts
+multi_turn_labv2_0,1,,7,0,0,0,13,0,0,33465,917,78.0,148.76,0,0,0,0,verified|unchecked
+multi_turn_labv2_1,1,,3,0,0,0,11,1,0,30344,700,57.97,100.57,0,0,1,0,verified|asked|partial
+multi_turn_labv2_2,1,,11,1,0,2,14,0,0,30874,421,99.95,130.27,0,0,0,0,verified
+multi_turn_labv2_3,1,,3,0,1,0,8,0,0,17357,375,80.95,130.22,0,0,1,0,asked|verified
+multi_turn_labv2_4,0,"lab:0 messages sent, expected 1; no message to USR002 mentioning [['ticket', 'quota']]",4,0,0,0,11,1,0,55898,855,201.23,252.05,0,0,0,0,partial|no_change
+multi_turn_labv2_5,1,,3,0,1,1,9,1,0,23212,696,81.61,121.3,0,0,1,0,asked|verified
+multi_turn_labv2_6,1,,5,0,0,0,11,0,0,23021,524,80.5,125.66,0,0,0,0,no_change|verified
+multi_turn_labv2_7,1,,4,0,0,0,8,0,0,13028,904,42.41,109.93,0,0,1,0,asked|verified
+multi_turn_labv2_8,1,,4,0,2,0,13,1,0,40171,743,114.35,166.87,0,0,1,0,no_change|partial
+multi_turn_labv2_9,1,,2,0,2,20,11,1,0,40758,965,180.11,222.17,0,0,1,0,partial|verified
+multi_turn_labv2_10,0,"lab:turn 1 answer does not name [['11'], ['12'], ['13']]",2,0,0,0,8,0,0,13075,403,50.75,87.94,0,0,0,0,no_change|verified
+multi_turn_labv2_11,1,,2,0,0,0,5,0,0,11007,216,27.01,46.75,0,0,0,0,verified
+multi_turn_labv2_12,0,"lab:file tree differs from the expected one; turn 1 should ask and change nothing, but made 1 changes",2,0,0,0,8,0,0,17429,416,76.73,103.08,2,2,1,1,verified|no_change
+multi_turn_labv2_13,1,,3,0,0,0,6,0,0,15271,337,21.98,37.08,0,0,0,0,verified
+multi_turn_labv2_14,1,,0,0,0,0,4,0,0,7305,281,6.56,25.16,0,0,1,0,asked|no_change
